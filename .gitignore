@@ -1,0 +1,8 @@
+bin/
+dist/
+*.test
+coverage.out
+coverage.html
+.DS_Store
+
+node_modules/
