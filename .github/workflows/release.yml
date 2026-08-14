@@ -1,0 +1,156 @@
+name: release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  detect:
+    name: Detect release-please merge
+    runs-on: ubuntu-latest
+    outputs:
+      is_release: ${{ steps.check.outputs.is_release }}
+      backend_version: ${{ steps.versions.outputs.backend_version }}
+      backend_released: ${{ steps.versions.outputs.backend_released }}
+      ui_version: ${{ steps.versions.outputs.ui_version }}
+      ui_released: ${{ steps.versions.outputs.ui_released }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: check
+        run: |
+          msg="$(git log -1 --pretty=%s)"
+          echo "head commit: $msg"
+          # For merge commits, GitHub's default subject is "Merge pull request #N ...",
+          # so also check the second parent's subject (the release-please commit).
+          parent2_msg=""
+          if [ "$(git rev-list --parents -n 1 HEAD | wc -w)" -gt 2 ]; then
+            parent2_msg="$(git log -1 --pretty=%s HEAD^2)"
+            echo "second parent: $parent2_msg"
+          fi
+          if echo "$msg" | grep -qiE '^chore(\(.*\))?: release' \
+             || echo "$parent2_msg" | grep -qiE '^chore(\(.*\))?: release'; then
+            echo "is_release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_release=false" >> "$GITHUB_OUTPUT"
+          fi
+      - id: versions
+        if: steps.check.outputs.is_release == 'true'
+        run: |
+          backend_version="$(jq -r '."."' .release-please-manifest.json)"
+          ui_version="$(jq -r '."ui"' .release-please-manifest.json)"
+          prev_backend="$(git show HEAD^1:.release-please-manifest.json | jq -r '."."')"
+          prev_ui="$(git show HEAD^1:.release-please-manifest.json | jq -r '."ui"')"
+          echo "backend_version=$backend_version" >> "$GITHUB_OUTPUT"
+          echo "ui_version=$ui_version" >> "$GITHUB_OUTPUT"
+          [ "$backend_version" != "$prev_backend" ] && echo "backend_released=true" >> "$GITHUB_OUTPUT" || echo "backend_released=false" >> "$GITHUB_OUTPUT"
+          [ "$ui_version" != "$prev_ui" ] && echo "ui_released=true" >> "$GITHUB_OUTPUT" || echo "ui_released=false" >> "$GITHUB_OUTPUT"
+
+  tag-release:
+    name: Tag and create GitHub Releases
+    needs: detect
+    if: needs.detect.outputs.is_release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag + release backend
+        if: needs.detect.outputs.backend_released == 'true'
+        run: |
+          tag="v${{ needs.detect.outputs.backend_version }}"
+          git tag "$tag"
+          git push origin "$tag"
+          notes="$(awk "/^## \[?${{ needs.detect.outputs.backend_version }}/{f=1;next} /^## /{if(f)exit} f" CHANGELOG.md)"
+          gh release create "$tag" --title "$tag" --notes "${notes:-Release $tag}"
+      - name: Tag + release UI remote
+        if: needs.detect.outputs.ui_released == 'true'
+        run: |
+          tag="ui-v${{ needs.detect.outputs.ui_version }}"
+          git tag "$tag"
+          git push origin "$tag"
+          notes="$(awk "/^## \[?${{ needs.detect.outputs.ui_version }}/{f=1;next} /^## /{if(f)exit} f" ui/CHANGELOG.md 2>/dev/null || true)"
+          gh release create "$tag" --title "$tag" --notes "${notes:-Release $tag}"
+
+  publish-backend:
+    name: Build, push and cosign-sign backend image
+    needs: [detect, tag-release]
+    if: needs.detect.outputs.backend_released == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    env:
+      IMAGE: ghcr.io/${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for Dockerfile (scaffold lands in M4-W3)
+        id: dockerfile
+        run: |
+          if [ -f Dockerfile ]; then echo "path=Dockerfile" >> "$GITHUB_OUTPUT";
+          elif [ -f backend/Dockerfile ]; then echo "path=backend/Dockerfile" >> "$GITHUB_OUTPUT";
+          else echo "path=" >> "$GITHUB_OUTPUT"; fi
+      - uses: sigstore/cosign-installer@v3
+        if: steps.dockerfile.outputs.path != ''
+      - uses: docker/setup-buildx-action@v3
+        if: steps.dockerfile.outputs.path != ''
+      - uses: docker/login-action@v3
+        if: steps.dockerfile.outputs.path != ''
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        if: steps.dockerfile.outputs.path != ''
+        with:
+          context: .
+          file: ${{ steps.dockerfile.outputs.path }}
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:v${{ needs.detect.outputs.backend_version }}
+            ${{ env.IMAGE }}:latest
+      - name: Cosign sign (keyless)
+        if: steps.dockerfile.outputs.path != ''
+        run: |
+          digest="$(docker buildx imagetools inspect "${IMAGE}:v${{ needs.detect.outputs.backend_version }}" --format '{{.Manifest.Digest}}')"
+          cosign sign --yes "${IMAGE}@${digest}"
+
+  publish-ui:
+    name: Build and publish UI remoteEntry.js
+    needs: [detect, tag-release]
+    if: needs.detect.outputs.ui_released == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for UI scaffold (lands in M4-W3)
+        id: ui
+        run: |
+          if [ -f ui/package.json ]; then echo "present=true" >> "$GITHUB_OUTPUT"; else echo "present=false" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/setup-node@v4
+        if: steps.ui.outputs.present == 'true'
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Build UI remote
+        if: steps.ui.outputs.present == 'true'
+        working-directory: ui
+        run: |
+          npm ci
+          npm run build
+      - name: Upload remoteEntry.js to GitHub Release
+        if: steps.ui.outputs.present == 'true'
+        run: |
+          tag="ui-v${{ needs.detect.outputs.ui_version }}"
+          find ui/dist -name 'remoteEntry.js' -exec gh release upload "$tag" {} --clobber \;
