@@ -25,7 +25,15 @@ jobs:
         run: |
           msg="$(git log -1 --pretty=%s)"
           echo "head commit: $msg"
-          if echo "$msg" | grep -qiE '^chore(\(.*\))?: release'; then
+          # For merge commits, GitHub's default subject is "Merge pull request #N ...",
+          # so also check the second parent's subject (the release-please commit).
+          parent2_msg=""
+          if [ "$(git rev-list --parents -n 1 HEAD | wc -w)" -gt 2 ]; then
+            parent2_msg="$(git log -1 --pretty=%s HEAD^2)"
+            echo "second parent: $parent2_msg"
+          fi
+          if echo "$msg" | grep -qiE '^chore(\(.*\))?: release' \
+             || echo "$parent2_msg" | grep -qiE '^chore(\(.*\))?: release'; then
             echo "is_release=true" >> "$GITHUB_OUTPUT"
           else
             echo "is_release=false" >> "$GITHUB_OUTPUT"
