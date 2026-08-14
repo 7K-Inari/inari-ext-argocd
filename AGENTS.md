@@ -11,6 +11,8 @@ Stack: Go (backend plugin) + TypeScript (UI remote)
 
 ## Conventions
 - Conventional Commits; SemVer releases; container images/artifacts cosign-signed (once CI exists).
+- **Release flow (release-please, PR-only mode):** pushes to `main` only open/update a Release PR (version bump + CHANGELOG) via `.github/workflows/release-please.yml` (`skip-github-release: true`). Manually merging the Release PR triggers `.github/workflows/release.yml` (push to `main`, detects the release merge by commit subject `chore: release …`) → creates tags + GitHub Releases → publish jobs: backend container image to GHCR (cosign keyless signing via OIDC) and UI `remoteEntry.js` uploaded to the UI GitHub Release. Publish jobs are guarded and no-op until the M4-W3 scaffold lands.
+- **Versioning strategy: release-please manifest mode with two path components** (`.` → release-type `go` for the backend, `ui` → release-type `node` for the UI remote; see `release-please-config.json` / `.release-please-manifest.json`). Chosen over a single `go` release with `extra-files` generic updater for `ui/package.json` because the repo ships two independently versioned artifacts (plan §6: container image + UI remote) — each gets its own tag (`v*` backend, `ui-v*` UI) and release cadence, and the `node` type bumps `ui/package.json` natively instead of via brittle generic-updater regexes. One shared Release PR (`separate-pull-requests: false`).
 - Write tests for new behavior; keep changes minimal and focused.
 - Canonical architecture & development plan: https://github.com/7K-Inari/inari-docs/blob/main/docs/architecture/inari-platform-plan.md (section references below point into it).
 
