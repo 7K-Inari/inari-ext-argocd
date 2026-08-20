@@ -76,6 +76,7 @@ func schema(action string) []byte {
       "required": ["kind", "name"],
       "properties": {
         "group":     {"type": "string"},
+        "version":   {"type": "string", "description": "API version, e.g. v1"},
         "kind":      {"type": "string"},
         "name":      {"type": "string"},
         "namespace": {"type": "string"}

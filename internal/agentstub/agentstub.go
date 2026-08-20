@@ -127,9 +127,14 @@ func (c *ArgoCDClient) execute(ctx context.Context, cmd *agentv1.InvokeAction) e
 		if g := res["group"].GetStringValue(); g != "" {
 			q.Set("group", g)
 		}
+		if v := res["version"].GetStringValue(); v != "" {
+			q.Set("version", v)
+		}
+		// ArgoCD expects the request body to be the action name itself,
+		// encoded as a JSON string — not an object.
 		return c.do(ctx, http.MethodPost,
 			fmt.Sprintf("/api/v1/applications/%s/resource/actions?%s", url.PathEscape(p.Name), q.Encode()),
-			map[string]any{"action": fields["resourceAction"].GetStringValue()})
+			fields["resourceAction"].GetStringValue())
 	default:
 		return fmt.Errorf("unsupported action %q", cmd.GetAction())
 	}

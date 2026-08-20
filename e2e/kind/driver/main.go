@@ -55,7 +55,7 @@ func main() {
 		{"argocd.sync", map[string]any{"clusterId": clusterID, "app": app}},
 		{"argocd.resource-action", map[string]any{
 			"clusterId": clusterID, "app": app,
-			"resource": map[string]any{"kind": "Deployment", "name": "guestbook-ui", "namespace": "default"},
+			"resource": map[string]any{"group": "apps", "version": "v1", "kind": "Deployment", "name": "guestbook-ui", "namespace": "default"},
 			"action":   "restart",
 		}},
 		{"argocd.rollback", map[string]any{"clusterId": clusterID, "app": app, "revisionId": 1, "dryRun": true}},

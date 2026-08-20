@@ -62,7 +62,10 @@ func (a AppRef) validate() error {
 // ResourceRef identifies a resource inside an Application for Lua resource
 // actions.
 type ResourceRef struct {
-	Group     string `json:"group,omitempty"`
+	Group string `json:"group,omitempty"`
+	// Version is the resource API version (e.g. "v1"); ArgoCD's resource
+	// lookup matches on group/kind/version, so set it for grouped resources.
+	Version   string `json:"version,omitempty"`
 	Kind      string `json:"kind"`
 	Name      string `json:"name"`
 	Namespace string `json:"namespace,omitempty"`
@@ -226,6 +229,9 @@ func BuildResourceAction(commandID string, in ResourceActionInput, sc Scoping, t
 	}
 	if in.Resource.Group != "" {
 		res["group"] = in.Resource.Group
+	}
+	if in.Resource.Version != "" {
+		res["version"] = in.Resource.Version
 	}
 	p["resource"] = res
 	p["resourceAction"] = in.Action
