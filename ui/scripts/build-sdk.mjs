@@ -37,6 +37,10 @@ execSync(`git clone --depth 1 --branch ${SDK_REF} ${SDK_GIT} "${buildDir}"`, { s
 run('npm ci --ignore-scripts', buildDir);
 run('npm run build', buildDir);
 rmSync(sdkDir, { recursive: true, force: true });
-cpSync(buildDir, sdkDir, { recursive: true });
+// Copy only the package's published file set — its node_modules contains a
+// stray Go package that breaks `go test ./...` at the repo root.
+for (const entry of ['package.json', 'README.md', 'dist', 'bin', 'templates', 'harness/shell', 'src/tokens/tokens.css']) {
+  cpSync(resolve(buildDir, entry), resolve(sdkDir, entry), { recursive: true });
+}
 rmSync(buildDir, { recursive: true, force: true });
 console.log('SDK built and installed');
