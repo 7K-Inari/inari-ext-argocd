@@ -12,7 +12,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -170,5 +169,4 @@ func TestFailsClosedWhenAgentDisconnected(t *testing.T) {
 	if err == nil || !errors.As(err, &pe) || pe.Code != pluginsdk.CodeUnavailable {
 		t.Fatalf("expected CodeUnavailable when agent disconnected, got %v", err)
 	}
-	fmt.Println("fails closed OK:", err)
 }

@@ -7,7 +7,10 @@ package extplugin
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	agentv1 "github.com/7K-Inari/inari-api/gen/go/inari/agent/v1"
@@ -99,6 +102,13 @@ func handle(cfg Config, action string) pluginsdk.Handler {
 			return nil, pluginsdk.Errorf(pluginsdk.CodeUnauthenticated, "missing auth context")
 		}
 
+		// The tunnel correlates acks by command ID; never send an empty one
+		// (some hosts/testkit leave RequestID unset).
+		commandID := req.RequestID
+		if commandID == "" {
+			commandID = newCommandID()
+		}
+
 		var clusterID string
 		var cmd *agentv1.InvokeAction
 		var err error
@@ -107,25 +117,25 @@ func handle(cfg Config, action string) pluginsdk.Handler {
 			var in argocd.SyncInput
 			if err = decodeStrict(req.Payload, &in); err == nil {
 				clusterID = in.ClusterID
-				cmd, err = argocd.BuildSync(req.RequestID, in, cfg.Scoping, cfg.timeout())
+				cmd, err = argocd.BuildSync(commandID, in, cfg.Scoping, cfg.timeout())
 			}
 		case argocd.ActionRefresh:
 			var in argocd.RefreshInput
 			if err = decodeStrict(req.Payload, &in); err == nil {
 				clusterID = in.ClusterID
-				cmd, err = argocd.BuildRefresh(req.RequestID, in, cfg.Scoping, cfg.timeout())
+				cmd, err = argocd.BuildRefresh(commandID, in, cfg.Scoping, cfg.timeout())
 			}
 		case argocd.ActionRollback:
 			var in argocd.RollbackInput
 			if err = decodeStrict(req.Payload, &in); err == nil {
 				clusterID = in.ClusterID
-				cmd, err = argocd.BuildRollback(req.RequestID, in, cfg.Scoping, cfg.timeout())
+				cmd, err = argocd.BuildRollback(commandID, in, cfg.Scoping, cfg.timeout())
 			}
 		case argocd.ActionResourceAction:
 			var in argocd.ResourceActionInput
 			if err = decodeStrict(req.Payload, &in); err == nil {
 				clusterID = in.ClusterID
-				cmd, err = argocd.BuildResourceAction(req.RequestID, in, cfg.Scoping, cfg.timeout())
+				cmd, err = argocd.BuildResourceAction(commandID, in, cfg.Scoping, cfg.timeout())
 			}
 		default:
 			return nil, pluginsdk.Errorf(pluginsdk.CodeNotFound, "unknown action %q", action)
@@ -168,4 +178,14 @@ func decodeStrict(payload []byte, v any) error {
 	dec := json.NewDecoder(bytesReader(payload))
 	dec.DisallowUnknownFields()
 	return dec.Decode(v)
+}
+
+// newCommandID generates a random command ID for ack correlation when the
+// host did not supply a request ID.
+func newCommandID() string {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return fmt.Sprintf("fallback-%d", time.Now().UnixNano())
+	}
+	return hex.EncodeToString(b[:])
 }

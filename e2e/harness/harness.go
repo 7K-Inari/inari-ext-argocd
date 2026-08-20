@@ -117,6 +117,16 @@ func (s *Server) invoke(ctx context.Context, cmd *agentv1.InvokeAction) (*agentv
 
 	ch := make(chan *agentv1.CommandAck, 1)
 	sess.mu.Lock()
+	if cmd.GetCommandId() == "" {
+		sess.mu.Unlock()
+		return nil, status.Error(codes.InvalidArgument, "commandId is required for ack correlation")
+	}
+	if _, dup := sess.acks[cmd.GetCommandId()]; dup {
+		// Refuse to clobber an in-flight waiter: a duplicate ID would
+		// mis-correlate the ack to the wrong caller.
+		sess.mu.Unlock()
+		return nil, status.Errorf(codes.Aborted, "duplicate commandId %q already in flight", cmd.GetCommandId())
+	}
 	sess.acks[cmd.GetCommandId()] = ch
 	sess.mu.Unlock()
 	defer func() {
