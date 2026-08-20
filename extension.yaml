@@ -1,0 +1,42 @@
+# Extension manifest registered with the control plane (plan §5.9 Extension
+# entity, §8.4 slots). The control plane validates it on install; keep in sync
+# with the plugin's registered actions and the UI remote's slots.
+apiVersion: inari.io/v1alpha1
+kind: Extension
+metadata:
+  name: inari-ext-argocd
+spec:
+  # version is stamped by release-please tags: v* (backend) / ui-v* (UI).
+  version: "0.1.1" # x-release-please-version
+  kinds: [backend, ui]
+
+  backend:
+    image: ghcr.io/7k-inari/inari-ext-argocd
+    # Image tag = backend release tag (v<version>); cosign keyless-signed.
+    digestPinning: required
+    actions:
+      - argocd.sync
+      - argocd.refresh
+      - argocd.rollback
+      - argocd.resource-action
+    env:
+      - name: INARI_AGENT_GATEWAY_ADDR
+        description: Control plane Agent Gateway endpoint injected by the Extension Host.
+      - name: INARI_MANAGED_PROJECTS
+        value: inari
+
+  ui:
+    # remoteEntry.js is attached to the ui-v* GitHub Release; the control
+    # plane serves it to the Module Federation host.
+    remoteEntry: https://github.com/7K-Inari/inari-ext-argocd/releases/download/ui-v0.1.0/remoteEntry.js # x-release-please-version
+    slots:
+      - { kind: cluster-tab, name: argocd-health }
+      - { kind: catalog-card, name: argocd-badge }
+      - { kind: instance-action, name: argocd-sync }
+      - { kind: instance-action, name: argocd-refresh }
+      - { kind: instance-action, name: argocd-rollback }
+
+  # RBAC surface (plan §5.8): the control plane requires callers to hold
+  # `extensions, invoke, inari-ext-argocd` before proxying any action.
+  permissions:
+    - extensions:invoke:inari-ext-argocd
