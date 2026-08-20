@@ -10,8 +10,8 @@ package e2e
 
 import (
 	"context"
-	"errors"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -28,8 +28,8 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 
 	"github.com/7K-Inari/inari-ext-argocd/e2e/harness"
-	"github.com/7K-Inari/inari-ext-argocd/internal/argocd"
 	"github.com/7K-Inari/inari-ext-argocd/internal/agentstub"
+	"github.com/7K-Inari/inari-ext-argocd/internal/argocd"
 	"github.com/7K-Inari/inari-ext-argocd/internal/extplugin"
 	"github.com/7K-Inari/inari-ext-argocd/internal/gateway"
 )

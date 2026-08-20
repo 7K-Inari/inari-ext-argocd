@@ -23,8 +23,8 @@ import (
 // Session is one connected agent: commands in, acks out.
 type Session struct {
 	Commands chan *agentv1.InvokeAction
-	acks   map[string]chan *agentv1.CommandAck
-	mu     sync.Mutex
+	acks     map[string]chan *agentv1.CommandAck
+	mu       sync.Mutex
 }
 
 func newSession() *Session {
@@ -50,7 +50,9 @@ type Server struct {
 }
 
 // NewServer builds a gateway server.
-func NewServer() *Server { return &Server{AgentTimeout: 30 * time.Second, sessions: map[string]*Session{}} }
+func NewServer() *Server {
+	return &Server{AgentTimeout: 30 * time.Second, sessions: map[string]*Session{}}
+}
 
 // RegisterAgent connects an agent session for clusterID; the returned cancel
 // function disconnects it (subsequent invokes fail closed with UNAVAILABLE).

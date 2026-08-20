@@ -35,10 +35,16 @@ func TestBuildRejectsUnmanagedProject(t *testing.T) {
 	bad := app()
 	bad.Project = "default"
 	for name, build := range map[string]func() error{
-		"sync":           func() error { _, e := BuildSync("c", SyncInput{ClusterID: "c-1", App: bad}, sc, 0); return e },
-		"refresh":        func() error { _, e := BuildRefresh("c", RefreshInput{ClusterID: "c-1", App: bad}, sc, 0); return e },
-		"rollback":       func() error { _, e := BuildRollback("c", RollbackInput{ClusterID: "c-1", App: bad, RevisionID: 3}, sc, 0); return e },
-		"resourceAction": func() error { _, e := BuildResourceAction("c", ResourceActionInput{ClusterID: "c-1", App: bad, Resource: ResourceRef{Kind: "Deployment", Name: "x"}, Action: "restart"}, sc, 0); return e },
+		"sync":    func() error { _, e := BuildSync("c", SyncInput{ClusterID: "c-1", App: bad}, sc, 0); return e },
+		"refresh": func() error { _, e := BuildRefresh("c", RefreshInput{ClusterID: "c-1", App: bad}, sc, 0); return e },
+		"rollback": func() error {
+			_, e := BuildRollback("c", RollbackInput{ClusterID: "c-1", App: bad, RevisionID: 3}, sc, 0)
+			return e
+		},
+		"resourceAction": func() error {
+			_, e := BuildResourceAction("c", ResourceActionInput{ClusterID: "c-1", App: bad, Resource: ResourceRef{Kind: "Deployment", Name: "x"}, Action: "restart"}, sc, 0)
+			return e
+		},
 	} {
 		if err := build(); err == nil || !strings.Contains(err.Error(), "not managed by Inari") {
 			t.Fatalf("%s: expected scoping rejection, got %v", name, err)
@@ -48,13 +54,28 @@ func TestBuildRejectsUnmanagedProject(t *testing.T) {
 
 func TestBuildValidation(t *testing.T) {
 	cases := map[string]func() error{
-		"missing cluster":  func() error { _, e := BuildSync("c", SyncInput{App: app()}, sc, 0); return e },
-		"bad app name":     func() error { _, e := BuildSync("c", SyncInput{ClusterID: "c", App: AppRef{Name: "Bad_Name", Namespace: "argocd", Project: "inari"}}, sc, 0); return e },
-		"missing project":  func() error { _, e := BuildSync("c", SyncInput{ClusterID: "c", App: AppRef{Name: "a", Namespace: "argocd"}}, sc, 0); return e },
-		"bad strategy":     func() error { _, e := BuildSync("c", SyncInput{ClusterID: "c", App: app(), Strategy: "wipe"}, sc, 0); return e },
-		"bad revision":     func() error { _, e := BuildRollback("c", RollbackInput{ClusterID: "c", App: app()}, sc, 0); return e },
-		"bad lua action":   func() error { _, e := BuildResourceAction("c", ResourceActionInput{ClusterID: "c", App: app(), Resource: ResourceRef{Kind: "Deployment", Name: "x"}, Action: "Delete();"}, sc, 0); return e },
-		"missing resource": func() error { _, e := BuildResourceAction("c", ResourceActionInput{ClusterID: "c", App: app(), Action: "restart"}, sc, 0); return e },
+		"missing cluster": func() error { _, e := BuildSync("c", SyncInput{App: app()}, sc, 0); return e },
+		"bad app name": func() error {
+			_, e := BuildSync("c", SyncInput{ClusterID: "c", App: AppRef{Name: "Bad_Name", Namespace: "argocd", Project: "inari"}}, sc, 0)
+			return e
+		},
+		"missing project": func() error {
+			_, e := BuildSync("c", SyncInput{ClusterID: "c", App: AppRef{Name: "a", Namespace: "argocd"}}, sc, 0)
+			return e
+		},
+		"bad strategy": func() error {
+			_, e := BuildSync("c", SyncInput{ClusterID: "c", App: app(), Strategy: "wipe"}, sc, 0)
+			return e
+		},
+		"bad revision": func() error { _, e := BuildRollback("c", RollbackInput{ClusterID: "c", App: app()}, sc, 0); return e },
+		"bad lua action": func() error {
+			_, e := BuildResourceAction("c", ResourceActionInput{ClusterID: "c", App: app(), Resource: ResourceRef{Kind: "Deployment", Name: "x"}, Action: "Delete();"}, sc, 0)
+			return e
+		},
+		"missing resource": func() error {
+			_, e := BuildResourceAction("c", ResourceActionInput{ClusterID: "c", App: app(), Action: "restart"}, sc, 0)
+			return e
+		},
 	}
 	for name, build := range cases {
 		if err := build(); err == nil {

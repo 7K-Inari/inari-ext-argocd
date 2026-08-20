@@ -94,7 +94,7 @@ func (c *ArgoCDClient) execute(ctx context.Context, cmd *agentv1.InvokeAction) e
 	switch cmd.GetAction() {
 	case "argocd.sync":
 		body := map[string]any{
-			"prune": fields["prune"].GetBoolValue(),
+			"prune":  fields["prune"].GetBoolValue(),
 			"dryRun": fields["dryRun"].GetBoolValue(),
 		}
 		if s := fields["strategy"].GetStringValue(); s != "" {
