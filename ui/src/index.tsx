@@ -3,7 +3,7 @@ import {
   ClusterTabBlueprint,
   CatalogCardBlueprint,
   InstanceActionBlueprint,
-} from '@inari/ui-plugin-sdk';
+} from '@7k-inari/ui-plugin-sdk';
 import { ArgoCDHealthTab } from './ClusterTab';
 import { ArgoCDDeliveryBadge } from './CatalogCard';
 import { runRefresh, runRollback, runSync } from './actions';

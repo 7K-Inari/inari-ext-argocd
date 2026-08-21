@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { ClusterTabSlotProps } from '@inari/ui-plugin-sdk';
+import type { ClusterTabSlotProps } from '@7k-inari/ui-plugin-sdk';
 import { listClusterInstances, type ResourceInstance } from './api';
 
 const HEALTH_COLORS: Record<string, string> = {

@@ -11,8 +11,8 @@
 
 export const EXTENSION_NAME = 'inari-ext-argocd';
 
-export type { ResourceInstance } from '@inari/ui-plugin-sdk';
-import type { ResourceInstance } from '@inari/ui-plugin-sdk';
+export type { ResourceInstance } from '@7k-inari/ui-plugin-sdk';
+import type { ResourceInstance } from '@7k-inari/ui-plugin-sdk';
 
 export interface ActionResult {
   commandId: string;
