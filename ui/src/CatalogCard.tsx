@@ -1,4 +1,4 @@
-import type { CatalogCardSlotProps } from '@inari/ui-plugin-sdk';
+import type { CatalogCardSlotProps } from '@7k-inari/ui-plugin-sdk';
 import { HealthBadge } from './ClusterTab';
 
 /** ArgoDCDeliveryBadge marks catalog items whose instances are delivered via

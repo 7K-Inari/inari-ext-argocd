@@ -1,4 +1,4 @@
-import type { ResourceInstance } from '@inari/ui-plugin-sdk';
+import type { ResourceInstance } from '@7k-inari/ui-plugin-sdk';
 import { argocdAppRef, invokeAction } from './api';
 
 // Instance action runners. The control plane proxies these calls to the
