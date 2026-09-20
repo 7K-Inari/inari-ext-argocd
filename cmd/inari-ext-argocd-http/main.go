@@ -90,6 +90,13 @@ func (a connectAdapter) GetInfo(ctx context.Context, req *connect.Request[plugin
 	if err != nil {
 		return nil, err
 	}
+	// COMPAT (inari-server <= 2.0.0): the released control plane compares
+	// api_version against the go-plugin wire version "1" instead of the
+	// contract version (fixed by 7K-Inari/inari-server cf4ed87). Remove this
+	// override once the platform runs the fixed server.
+	if v := os.Getenv("INARI_COMPAT_API_VERSION"); v != "" && r.GetInfo() != nil {
+		r.Info.ApiVersion = v
+	}
 	return connect.NewResponse(r), nil
 }
 
