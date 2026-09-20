@@ -44,6 +44,7 @@ func run(ctx context.Context) error {
 			Addr:          addr,
 			Insecure:      os.Getenv("INARI_AGENT_GATEWAY_INSECURE") == "true",
 			TLSServerName: os.Getenv("INARI_AGENT_GATEWAY_TLS_NAME"),
+			Token:         os.Getenv("INARI_EXTENSION_GATEWAY_TOKEN"),
 		})
 		if err != nil {
 			return err
