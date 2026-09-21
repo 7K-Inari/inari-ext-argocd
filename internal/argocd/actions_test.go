@@ -90,7 +90,7 @@ func TestBuildRollbackAndResourceAction(t *testing.T) {
 		t.Fatalf("BuildRollback: %v", err)
 	}
 	p := rb.GetParameters().AsMap()
-	if p["revisionId"].(float64) != 7 || p["dryRun"] != true {
+	if p["id"].(float64) != 7 || p["dryRun"] != true {
 		t.Fatalf("rollback params: %v", p)
 	}
 	if rb.GetTimeout().AsDuration() != 5*time.Second {

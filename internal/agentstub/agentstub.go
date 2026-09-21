@@ -18,6 +18,8 @@ import (
 	"net/url"
 	"time"
 
+	"google.golang.org/protobuf/types/known/structpb"
+
 	agentv1 "github.com/7K-Inari/inari-api/gen/go/inari/agent/v1"
 )
 
@@ -112,7 +114,7 @@ func (c *ArgoCDClient) execute(ctx context.Context, cmd *agentv1.InvokeAction) e
 	case "rollback":
 		return c.do(ctx, http.MethodPost,
 			fmt.Sprintf("/api/v1/applications/%s/rollback", url.PathEscape(p.Name)), map[string]any{
-				"id":     fields["revisionId"].GetNumberValue(),
+				"id":     rollbackID(fields),
 				"prune":  fields["prune"].GetBoolValue(),
 				"dryRun": fields["dryRun"].GetBoolValue(),
 			})
@@ -169,4 +171,13 @@ func (c *ArgoCDClient) do(ctx context.Context, method, path string, body any) er
 		return fmt.Errorf("argocd api %s %s: %s: %s", method, path, resp.Status, string(b))
 	}
 	return nil
+}
+
+// rollbackID accepts the bare "id" (agent contract) with a legacy
+// "revisionId" fallback for older plugins.
+func rollbackID(fields map[string]*structpb.Value) float64 {
+	if v, ok := fields["id"]; ok && v.GetNumberValue() != 0 {
+		return v.GetNumberValue()
+	}
+	return fields["revisionId"].GetNumberValue()
 }

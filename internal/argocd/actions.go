@@ -207,7 +207,8 @@ func BuildRollback(commandID string, in RollbackInput, sc Scoping, timeout time.
 		timeout = DefaultTimeout
 	}
 	p := baseParams(in.App)
-	p["revisionId"] = in.RevisionID
+	// The real agent reads the bare ArgoCD field "id" (params["id"]).
+	p["id"] = in.RevisionID
 	p["prune"] = in.Prune
 	p["dryRun"] = in.DryRun
 	return buildCommand(commandID, in.App, ActionRollback, timeout, p)
