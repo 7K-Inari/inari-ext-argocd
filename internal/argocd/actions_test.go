@@ -15,7 +15,7 @@ func TestBuildSync(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildSync: %v", err)
 	}
-	if cmd.GetCommandId() != "cmd-1" || cmd.GetAction() != ActionSync {
+	if cmd.GetCommandId() != "cmd-1" || cmd.GetAction() != "sync" {
 		t.Fatalf("unexpected command: %v", cmd)
 	}
 	if cmd.GetTimeout().AsDuration() != DefaultTimeout {

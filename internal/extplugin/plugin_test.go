@@ -104,7 +104,8 @@ func TestSyncRoundTrip(t *testing.T) {
 	if gw.last.TenantID != "tenant-acme" || gw.last.ClusterID != "cluster-1" {
 		t.Fatalf("routing: %+v", gw.last)
 	}
-	if gw.last.Command.GetAction() != argocd.ActionSync {
+	if gw.last.Command.GetAction() != "sync" { // agent-side verb is bare
+
 		t.Fatalf("command action: %v", gw.last.Command.GetAction())
 	}
 	if gw.last.Command.GetParameters().AsMap()["prune"] != true {

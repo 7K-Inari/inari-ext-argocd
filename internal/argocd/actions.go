@@ -8,6 +8,7 @@ package argocd
 import (
 	"fmt"
 	"regexp"
+	"strings"
 	"time"
 
 	agentv1 "github.com/7K-Inari/inari-api/gen/go/inari/agent/v1"
@@ -148,9 +149,11 @@ func buildCommand(commandID string, action string, timeout time.Duration, params
 	if err != nil {
 		return nil, fmt.Errorf("encode parameters: %w", err)
 	}
+	// The agent-side allow-list uses bare verbs (sync|refresh|rollback);
+	// the extension's public action names are namespaced (argocd.*).
 	return &agentv1.InvokeAction{
 		CommandId:  commandID,
-		Action:     action,
+		Action:     strings.TrimPrefix(action, "argocd."),
 		Parameters: p,
 		Timeout:    durationpb.New(timeout),
 	}, nil

@@ -82,7 +82,7 @@ func TestSyncHitsArgoCDWireShape(t *testing.T) {
 	p := managedAppParams()
 	p["prune"] = true
 	p["strategy"] = "hook"
-	ack := managedClient(srv).Execute(context.Background(), cmd(t, "argocd.sync", p))
+	ack := managedClient(srv).Execute(context.Background(), cmd(t, "sync", p))
 	if ack.GetResult() != agentv1.CommandResult_COMMAND_RESULT_APPLIED {
 		t.Fatalf("ack: %v", ack)
 	}
@@ -112,7 +112,7 @@ func TestRefreshHardQueryParam(t *testing.T) {
 
 	p := managedAppParams()
 	p["hard"] = true
-	ack := managedClient(srv).Execute(context.Background(), cmd(t, "argocd.refresh", p))
+	ack := managedClient(srv).Execute(context.Background(), cmd(t, "refresh", p))
 	if ack.GetResult() != agentv1.CommandResult_COMMAND_RESULT_APPLIED {
 		t.Fatalf("ack: %v", ack)
 	}
@@ -128,7 +128,7 @@ func TestRollbackBodyCarriesHistoryID(t *testing.T) {
 
 	p := managedAppParams()
 	p["revisionId"] = 7
-	ack := managedClient(srv).Execute(context.Background(), cmd(t, "argocd.rollback", p))
+	ack := managedClient(srv).Execute(context.Background(), cmd(t, "rollback", p))
 	if ack.GetResult() != agentv1.CommandResult_COMMAND_RESULT_APPLIED {
 		t.Fatalf("ack: %v", ack)
 	}
@@ -149,7 +149,7 @@ func TestResourceActionBodyIsBareActionName(t *testing.T) {
 	p := managedAppParams()
 	p["resource"] = map[string]any{"group": "apps", "version": "v1", "kind": "Deployment", "name": "web", "namespace": "shop"}
 	p["resourceAction"] = "restart"
-	ack := managedClient(srv).Execute(context.Background(), cmd(t, "argocd.resource-action", p))
+	ack := managedClient(srv).Execute(context.Background(), cmd(t, "resource-action", p))
 	if ack.GetResult() != agentv1.CommandResult_COMMAND_RESULT_APPLIED {
 		t.Fatalf("ack: %v", ack)
 	}
@@ -172,7 +172,7 @@ func TestUnmanagedProjectFailsClosed(t *testing.T) {
 	defer srv.Close()
 
 	p := map[string]any{"app": map[string]any{"name": "x", "namespace": "argocd", "project": "default"}}
-	ack := managedClient(srv).Execute(context.Background(), cmd(t, "argocd.sync", p))
+	ack := managedClient(srv).Execute(context.Background(), cmd(t, "sync", p))
 	if ack.GetResult() != agentv1.CommandResult_COMMAND_RESULT_FAILED {
 		t.Fatalf("expected FAILED, got %v", ack.GetResult())
 	}
@@ -186,7 +186,7 @@ func TestArgoCDErrorBecomesFailedAck(t *testing.T) {
 	srv := httptest.NewServer(rec.handler())
 	defer srv.Close()
 
-	ack := managedClient(srv).Execute(context.Background(), cmd(t, "argocd.sync", managedAppParams()))
+	ack := managedClient(srv).Execute(context.Background(), cmd(t, "sync", managedAppParams()))
 	if ack.GetResult() != agentv1.CommandResult_COMMAND_RESULT_FAILED {
 		t.Fatalf("expected FAILED, got %v", ack.GetResult())
 	}
@@ -200,7 +200,7 @@ func TestCommandTimeoutBoundsExecution(t *testing.T) {
 	srv := httptest.NewServer(rec.handler())
 	defer srv.Close()
 
-	c := cmd(t, "argocd.sync", managedAppParams())
+	c := cmd(t, "sync", managedAppParams())
 	c.Timeout = durationpb.New(100 * time.Millisecond)
 	start := time.Now()
 	ack := managedClient(srv).Execute(context.Background(), c)
@@ -219,7 +219,7 @@ func TestAppNameIsPathEscaped(t *testing.T) {
 
 	// An app name containing a slash must not alter the path structure.
 	p := map[string]any{"app": map[string]any{"name": "a/b", "namespace": "argocd", "project": "inari"}}
-	managedClient(srv).Execute(context.Background(), cmd(t, "argocd.sync", p))
+	managedClient(srv).Execute(context.Background(), cmd(t, "sync", p))
 	if rec.last().url != "/api/v1/applications/a%2Fb/sync" {
 		t.Fatalf("url: %s", rec.last().url)
 	}
