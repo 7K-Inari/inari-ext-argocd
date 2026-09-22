@@ -123,8 +123,11 @@ jobs:
         run: |
           npm ci
           npm run build
-      - name: Upload remoteEntry.js to GitHub Release
+      - name: Upload remoteEntry.js + chunks to GitHub Release
         if: steps.ui.outputs.present == 'true'
         run: |
           tag="ui-v${{ needs.release.outputs.ui_version }}"
-          find ui/dist -name 'remoteEntry.js' -exec gh release upload "$tag" {} --clobber \;
+          # Webpack MF remotes lazy-load async chunks next to remoteEntry.js —
+          # upload the whole dist so hubs can serve them (RUNTIME/chunk errors
+          # otherwise).
+          find ui/dist \( -name '*.js' -o -name '*.js.LICENSE.txt' \) -exec gh release upload "$tag" {} --clobber \;
