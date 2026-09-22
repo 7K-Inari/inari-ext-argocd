@@ -1,3 +1,5 @@
+connectrpc.com/connect v1.20.0 h1:6TNDAB+WeNd2uolWNlYczB5E0KNNaVMNUEx8JEUsPmQ=
+connectrpc.com/connect v1.20.0/go.mod h1:A2ygJrukXwWy32vkCAAHNVguZrqZ+jeZ9rGRnGR4dN4=
 github.com/7K-Inari/inari-api v0.3.1-0.20260820131115-76d69f96bebe h1:xhHQc88nEjJC4tGY/WG/sxEW7H4J3T+K4zwLFJLM5Zs=
 github.com/7K-Inari/inari-api v0.3.1-0.20260820131115-76d69f96bebe/go.mod h1:+74y2AihE0BCqM4L2G6AIjN+pu5C88YhW8wFKf7JmmA=
 github.com/7K-Inari/inari-plugin-sdk v0.0.0-20260820115325-1957df8c8c8b h1:RgLAIf1hd0alJePnopEv6bCdMy+3YdIRrjOGuVVeXoE=
