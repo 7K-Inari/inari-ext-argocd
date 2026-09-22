@@ -14,7 +14,8 @@ const testTenant: TenantState = {
   switchTenant: () => {},
   onTenantChange: () => () => {},
 };
-const withTenant = (el: React.ReactElement) => createElement(TenantProvider, { value: testTenant }, el);
+const withTenant = (el: React.ReactElement) =>
+  createElement(TenantProvider, { value: testTenant, children: el });
 import { ArgoCDDeliveryBadge } from '../src/CatalogCard';
 
 const instance = {
