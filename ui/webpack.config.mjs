@@ -13,7 +13,9 @@ const shared = {
   react: { singleton: true, requiredVersion: '^18.3.1' },
   'react-dom': { singleton: true, requiredVersion: '^18.3.1' },
   zod: { singleton: true },
-  '@inari/ui-plugin-sdk': { singleton: true },
+  // No local fallback: the SDK is host-provided only (the fallback chunk
+  // would be emitted empty by webpack and break the expose path).
+  '@7k-inari/ui-plugin-sdk': { singleton: true, import: false },
 };
 
 export default {
