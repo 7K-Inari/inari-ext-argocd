@@ -131,3 +131,9 @@ jobs:
           # upload the whole dist so hubs can serve them (RUNTIME/chunk errors
           # otherwise).
           find ui/dist \( -name '*.js' -o -name '*.js.LICENSE.txt' \) -exec gh release upload "$tag" {} --clobber \;
+      - name: Verify release asset completeness
+        if: steps.ui.outputs.present == 'true'
+        working-directory: ui
+        # Guard for the "Loading chunk 616 failed" regression (issue #10):
+        # fail the release if any dist js/chunk is missing from the release.
+        run: node scripts/check-release-assets.mjs "ui-v${{ needs.release.outputs.ui_version }}"
