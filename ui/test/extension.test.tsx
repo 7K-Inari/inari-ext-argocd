@@ -6,6 +6,16 @@ import extension from '../src/index';
 import { invokeAction, argocdAppRef } from '../src/api';
 import { runSync, runRefresh, runRollback } from '../src/actions';
 import { ArgoCDHealthTab, HealthBadge } from '../src/ClusterTab';
+import { TenantProvider, type TenantState } from '@7k-inari/ui-plugin-sdk';
+
+const testTenant: TenantState = {
+  current: { orgId: 'acme', orgName: 'Acme' },
+  available: [{ orgId: 'acme', orgName: 'Acme' }],
+  switchTenant: () => {},
+  onTenantChange: () => () => {},
+};
+const withTenant = (el: React.ReactElement) =>
+  createElement(TenantProvider, { value: testTenant, children: el });
 import { ArgoCDDeliveryBadge } from '../src/CatalogCard';
 
 const instance = {
@@ -111,7 +121,7 @@ describe('components', () => {
     document.body.appendChild(el);
     const root = createRoot(el);
     await act(async () => {
-      root.render(createElement(ArgoCDHealthTab, { cluster: { id: 'cluster-1', name: 'prod-1', tenantId: 't', state: 'Active' } }));
+      root.render(withTenant(createElement(ArgoCDHealthTab, { cluster: { id: 'cluster-1', name: 'prod-1', tenantId: 't', state: 'Active' } })));
     });
     expect(el.innerHTML).toContain('ArgoCD health — prod-1');
     expect(el.innerHTML).toContain('web-shop');

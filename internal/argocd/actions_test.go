@@ -15,7 +15,7 @@ func TestBuildSync(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildSync: %v", err)
 	}
-	if cmd.GetCommandId() != "cmd-1" || cmd.GetAction() != ActionSync {
+	if cmd.GetCommandId() != "cmd-1" || cmd.GetAction() != "sync" {
 		t.Fatalf("unexpected command: %v", cmd)
 	}
 	if cmd.GetTimeout().AsDuration() != DefaultTimeout {
@@ -90,7 +90,7 @@ func TestBuildRollbackAndResourceAction(t *testing.T) {
 		t.Fatalf("BuildRollback: %v", err)
 	}
 	p := rb.GetParameters().AsMap()
-	if p["revisionId"].(float64) != 7 || p["dryRun"] != true {
+	if p["id"].(float64) != 7 || p["dryRun"] != true {
 		t.Fatalf("rollback params: %v", p)
 	}
 	if rb.GetTimeout().AsDuration() != 5*time.Second {

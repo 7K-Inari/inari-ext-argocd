@@ -43,8 +43,11 @@ export function invokeAction(action: string, payload: unknown): Promise<ActionRe
 }
 
 /** listClusterInstances reads the host's resource inventory for a cluster. */
-export function listClusterInstances(clusterId: string): Promise<ResourceInstance[]> {
-  return request<ResourceInstance[]>('GET', `/api/v1/resources?clusterId=${encodeURIComponent(clusterId)}`);
+export function listClusterInstances(org: string, clusterId: string): Promise<ResourceInstance[]> {
+  return request<ResourceInstance[]>(
+    'GET',
+    `/api/v1/tenants/${encodeURIComponent(org)}/instances?clusterId=${encodeURIComponent(clusterId)}`,
+  );
 }
 
 /** argocdAppRef extracts the ArgoCD Application identity the orchestrator

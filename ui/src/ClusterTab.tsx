@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ClusterTabSlotProps } from '@7k-inari/ui-plugin-sdk';
+import { useTenant } from '@7k-inari/ui-plugin-sdk';
 import { listClusterInstances, type ResourceInstance } from './api';
 
 const HEALTH_COLORS: Record<string, string> = {
@@ -32,18 +33,20 @@ export function HealthBadge({ health }: { health?: string }) {
 /** ArgoCDHealthTab is the ClusterTab contribution: ArgoCD health of every
  * resource instance on the cluster. */
 export function ArgoCDHealthTab({ cluster }: ClusterTabSlotProps) {
+  const { current } = useTenant();
   const [instances, setInstances] = useState<ResourceInstance[]>([]);
   const [error, setError] = useState<string>();
 
   useEffect(() => {
+    if (!current) return;
     let cancelled = false;
-    listClusterInstances(cluster.id)
+    listClusterInstances(current.orgId, cluster.id)
       .then((list) => !cancelled && setInstances(list))
       .catch((e: Error) => !cancelled && setError(e.message));
     return () => {
       cancelled = true;
     };
-  }, [cluster.id]);
+  }, [current, cluster.id]);
 
   return (
     <section>

@@ -8,6 +8,7 @@ package argocd
 import (
 	"fmt"
 	"regexp"
+	"strings"
 	"time"
 
 	agentv1 "github.com/7K-Inari/inari-api/gen/go/inari/agent/v1"
@@ -143,14 +144,19 @@ func baseParams(app AppRef) map[string]any {
 	}
 }
 
-func buildCommand(commandID string, action string, timeout time.Duration, params map[string]any) (*agentv1.InvokeAction, error) {
+func buildCommand(commandID string, app AppRef, action string, timeout time.Duration, params map[string]any) (*agentv1.InvokeAction, error) {
 	p, err := structpb.NewStruct(params)
 	if err != nil {
 		return nil, fmt.Errorf("encode parameters: %w", err)
 	}
+	// The agent-side allow-list uses bare verbs (sync|refresh|rollback);
+	// the extension's public action names are namespaced (argocd.*).
 	return &agentv1.InvokeAction{
-		CommandId:  commandID,
-		Action:     action,
+		CommandId: commandID,
+		Action:    strings.TrimPrefix(action, "argocd."),
+		// The agent resolves the target Application from Resource (params
+		// carry only call arguments).
+		Resource:   &agentv1.ResourceRef{Kind: "Application", Name: app.Name, Namespace: app.Namespace},
 		Parameters: p,
 		Timeout:    durationpb.New(timeout),
 	}, nil
@@ -173,7 +179,7 @@ func BuildSync(commandID string, in SyncInput, sc Scoping, timeout time.Duration
 	if in.Strategy != "" {
 		p["strategy"] = in.Strategy
 	}
-	return buildCommand(commandID, ActionSync, timeout, p)
+	return buildCommand(commandID, in.App, ActionSync, timeout, p)
 }
 
 // BuildRefresh validates in and builds the refresh command.
@@ -186,7 +192,7 @@ func BuildRefresh(commandID string, in RefreshInput, sc Scoping, timeout time.Du
 	}
 	p := baseParams(in.App)
 	p["hard"] = in.Hard
-	return buildCommand(commandID, ActionRefresh, timeout, p)
+	return buildCommand(commandID, in.App, ActionRefresh, timeout, p)
 }
 
 // BuildRollback validates in and builds the rollback command.
@@ -201,10 +207,11 @@ func BuildRollback(commandID string, in RollbackInput, sc Scoping, timeout time.
 		timeout = DefaultTimeout
 	}
 	p := baseParams(in.App)
-	p["revisionId"] = in.RevisionID
+	// The real agent reads the bare ArgoCD field "id" (params["id"]).
+	p["id"] = in.RevisionID
 	p["prune"] = in.Prune
 	p["dryRun"] = in.DryRun
-	return buildCommand(commandID, ActionRollback, timeout, p)
+	return buildCommand(commandID, in.App, ActionRollback, timeout, p)
 }
 
 // BuildResourceAction validates in and builds the Lua resource action command.
@@ -238,7 +245,7 @@ func BuildResourceAction(commandID string, in ResourceActionInput, sc Scoping, t
 	if len(in.Params) > 0 {
 		p["actionParams"] = in.Params
 	}
-	return buildCommand(commandID, ActionResourceAction, timeout, p)
+	return buildCommand(commandID, in.App, ActionResourceAction, timeout, p)
 }
 
 func validateCommon(clusterID string, app AppRef, sc Scoping) error {

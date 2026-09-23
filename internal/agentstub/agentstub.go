@@ -18,6 +18,8 @@ import (
 	"net/url"
 	"time"
 
+	"google.golang.org/protobuf/types/known/structpb"
+
 	agentv1 "github.com/7K-Inari/inari-api/gen/go/inari/agent/v1"
 )
 
@@ -92,7 +94,7 @@ func (c *ArgoCDClient) execute(ctx context.Context, cmd *agentv1.InvokeAction) e
 	}
 	fields := cmd.GetParameters().GetFields()
 	switch cmd.GetAction() {
-	case "argocd.sync":
+	case "sync":
 		body := map[string]any{
 			"prune":  fields["prune"].GetBoolValue(),
 			"dryRun": fields["dryRun"].GetBoolValue(),
@@ -102,21 +104,21 @@ func (c *ArgoCDClient) execute(ctx context.Context, cmd *agentv1.InvokeAction) e
 		}
 		return c.do(ctx, http.MethodPost,
 			fmt.Sprintf("/api/v1/applications/%s/sync", url.PathEscape(p.Name)), body)
-	case "argocd.refresh":
+	case "refresh":
 		refresh := "normal"
 		if fields["hard"].GetBoolValue() {
 			refresh = "hard"
 		}
 		return c.do(ctx, http.MethodGet,
 			fmt.Sprintf("/api/v1/applications/%s?refresh=%s", url.PathEscape(p.Name), refresh), nil)
-	case "argocd.rollback":
+	case "rollback":
 		return c.do(ctx, http.MethodPost,
 			fmt.Sprintf("/api/v1/applications/%s/rollback", url.PathEscape(p.Name)), map[string]any{
-				"id":     fields["revisionId"].GetNumberValue(),
+				"id":     rollbackID(fields),
 				"prune":  fields["prune"].GetBoolValue(),
 				"dryRun": fields["dryRun"].GetBoolValue(),
 			})
-	case "argocd.resource-action":
+	case "resource-action":
 		res := fields["resource"].GetStructValue().GetFields()
 		q := url.Values{}
 		q.Set("kind", res["kind"].GetStringValue())
@@ -169,4 +171,13 @@ func (c *ArgoCDClient) do(ctx context.Context, method, path string, body any) er
 		return fmt.Errorf("argocd api %s %s: %s: %s", method, path, resp.Status, string(b))
 	}
 	return nil
+}
+
+// rollbackID accepts the bare "id" (agent contract) with a legacy
+// "revisionId" fallback for older plugins.
+func rollbackID(fields map[string]*structpb.Value) float64 {
+	if v, ok := fields["id"]; ok && v.GetNumberValue() != 0 {
+		return v.GetNumberValue()
+	}
+	return fields["revisionId"].GetNumberValue()
 }

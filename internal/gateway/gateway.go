@@ -40,6 +40,9 @@ const InvokeMethod = "/inari.extensions.v1.AgentGateway/InvokeAction"
 const (
 	MetadataTenant  = "x-inari-tenant"
 	MetadataCluster = "x-inari-cluster"
+	// MetadataToken carries the shared extension-gateway gate token
+	// (server: INARI_EXTENSION_GATEWAY_TOKEN; empty = endpoint disabled).
+	MetadataToken = "x-inari-extension-token"
 )
 
 // contentSubtype selects the protojson codec registered below.
@@ -98,11 +101,16 @@ type Config struct {
 	Insecure bool
 	// TLSServerName overrides the TLS server name when set.
 	TLSServerName string
+	// Token is the shared extension-gateway gate token, sent as
+	// x-inari-extension-token. Optional: only needed when the control plane
+	// has INARI_EXTENSION_GATEWAY_TOKEN configured.
+	Token string
 }
 
 // Client is a gRPC Gateway.
 type Client struct {
-	conn *grpc.ClientConn
+	conn  *grpc.ClientConn
+	token string
 }
 
 // Dial connects to the control plane's Agent Gateway. The connection is
@@ -122,7 +130,7 @@ func Dial(cfg Config) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("dial agent gateway: %w", err)
 	}
-	return &Client{conn: conn}, nil
+	return &Client{conn: conn, token: cfg.Token}, nil
 }
 
 // New wraps an existing connection as a Gateway. Used by Dial and by tests /
@@ -144,6 +152,9 @@ func (c *Client) InvokeAction(ctx context.Context, req Request) (*agentv1.Comman
 		MetadataTenant, req.TenantID,
 		MetadataCluster, req.ClusterID,
 	)
+	if c.token != "" {
+		ctx = metadata.AppendToOutgoingContext(ctx, MetadataToken, c.token)
+	}
 	ack := &agentv1.CommandAck{}
 	err := c.conn.Invoke(ctx, InvokeMethod, req.Command, ack, grpc.CallContentSubtype(contentSubtype))
 	if err != nil {
