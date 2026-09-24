@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.1](https://github.com/7K-Inari/inari-ext-argocd/compare/ui-v0.2.0...ui-v0.2.1) (2026-09-24)
+
+
+### Bug Fixes
+
+* **ui:** correct SDK share name, shell bearer auth, richer cluster tab ([#13](https://github.com/7K-Inari/inari-ext-argocd/issues/13)) ([b3cfd64](https://github.com/7K-Inari/inari-ext-argocd/commit/b3cfd646acb998cfa8c95fac7f87831936698bf3))
+* **ui:** tenant-scoped instances path (was hardcoded /api/v1/resources → 404) ([682964b](https://github.com/7K-Inari/inari-ext-argocd/commit/682964ba3f7738499627195f47a2b873da235e39))
+
 ## [0.2.0](https://github.com/7K-Inari/inari-ext-argocd/compare/ui-v0.1.0...ui-v0.2.0) (2026-08-21)
 
 
