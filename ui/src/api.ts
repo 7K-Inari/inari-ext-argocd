@@ -25,9 +25,12 @@ export function configureAuth(getToken: TokenProvider): void {
 async function resolveToken(): Promise<string | undefined> {
   if (tokenProvider) return tokenProvider();
   // Fallback for action runners invoked outside any extension component:
-  // read the shared SDK's module-level auth state.
-  const { getAuthState } = await import('@7k-inari/ui-plugin-sdk');
-  return getAuthState()?.getToken();
+  // read the shared SDK's module-level auth state. getAuthState lands in SDK
+  // 0.1.6; stay type-compatible with 0.1.5 (optional access).
+  const sdk = (await import('@7k-inari/ui-plugin-sdk')) as unknown as {
+    getAuthState?: () => { getToken: TokenProvider } | null;
+  };
+  return sdk.getAuthState?.()?.getToken();
 }
 
 export type { ResourceInstance } from '@7k-inari/ui-plugin-sdk';
