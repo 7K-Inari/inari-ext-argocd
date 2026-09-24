@@ -64,6 +64,28 @@ describe('invokeAction', () => {
     expect(JSON.parse((init as RequestInit).body as string)).toEqual({ clusterId: 'cluster-1' });
   });
 
+  it('attaches the shell bearer token once configured', async () => {
+    const { configureAuth } = await import('../src/api');
+    configureAuth(() => 'shell-token');
+    const spy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response('{"commandId":"c1","outcome":"applied"}', { status: 200 }));
+    await invokeAction('argocd.sync', {});
+    const headers = (spy.mock.calls[0][1] as RequestInit).headers as Record<string, string>;
+    expect(headers['authorization']).toBe('Bearer shell-token');
+  });
+
+  it('omits the authorization header without a token', async () => {
+    const { configureAuth } = await import('../src/api');
+    configureAuth(() => undefined);
+    const spy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response('{"commandId":"c1","outcome":"applied"}', { status: 200 }));
+    await invokeAction('argocd.sync', {});
+    const headers = (spy.mock.calls[0][1] as RequestInit).headers as Record<string, string>;
+    expect(headers['authorization']).toBeUndefined();
+  });
+
   it('throws on non-2xx', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('nope', { status: 403 }));
     await expect(invokeAction('argocd.sync', {})).rejects.toThrow('403');
@@ -113,6 +135,19 @@ describe('argocdAppRef', () => {
 describe('components', () => {
   it('HealthBadge renders health', () => {
     expect(renderToStaticMarkup(createElement(HealthBadge, { health: 'Degraded' }))).toContain('Degraded');
+  });
+
+  it('ClusterTab unwraps the server list envelope', async () => {
+    const spy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(JSON.stringify({ instances: [instance] }), { status: 200 }));
+    const { listClusterInstances } = await import('../src/api');
+    const list = await listClusterInstances('acme', 'cluster-1');
+    expect(list).toHaveLength(1);
+    expect(list[0].id).toBe('ri-1');
+    // Regression: the server wraps lists in { instances }; a raw-array parse
+    // made every tab render empty.
+    expect(spy.mock.calls[0][0]).toContain('/api/v1/tenants/acme/instances');
   });
 
   it('ClusterTab lists instances with health badges', async () => {
