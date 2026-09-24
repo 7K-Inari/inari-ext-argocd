@@ -56,13 +56,29 @@ export function ArgoCDHealthTab({ cluster }: ClusterTabSlotProps) {
       <h3>ArgoCD health — {cluster.name}</h3>
       {error && <p role="alert">Failed to load instances: {error}</p>}
       {!error && instances.length === 0 && <p>No Inari-managed instances on this cluster.</p>}
-      <ul>
-        {instances.map((i) => (
-          <li key={i.id}>
-            <strong>{i.name}</strong> {i.namespace ? `(${i.namespace}) ` : ''}
-            <HealthBadge health={i.health} />
-          </li>
-        ))}
+      <ul style={{ listStyle: 'none', padding: 0, margin: '8px 0' }}>
+        {instances.map((i) => {
+          // Server returns state/statusMessage as top-level fields.
+          const top = i as unknown as Record<string, unknown>;
+          const state = (top.state as string) ?? '';
+          const message = (top.statusMessage as string) ?? '';
+          return (
+            <li key={i.id} style={{ display: 'flex', alignItems: 'baseline', gap: 8, padding: '4px 0' }}>
+              <strong>{i.name || i.id}</strong>
+              <span style={{ color: '#6e7781', fontSize: 12 }}>{i.catalogItemId.replace(/^curated:/, '')}</span>
+              {i.namespace ? <span style={{ color: '#6e7781', fontSize: 12 }}>({i.namespace})</span> : null}
+              <HealthBadge health={i.health} />
+              {state && state !== 'running' ? (
+                <span style={{ color: '#6e7781', fontSize: 12 }}>{state}</span>
+              ) : null}
+              {message ? (
+                <span title={message} style={{ color: '#bf8700', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 360 }}>
+                  {message}
+                </span>
+              ) : null}
+            </li>
+          );
+        })}
       </ul>
     </section>
   );
