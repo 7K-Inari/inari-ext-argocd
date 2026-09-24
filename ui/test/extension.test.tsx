@@ -6,7 +6,7 @@ import extension from '../src/index';
 import { invokeAction, argocdAppRef } from '../src/api';
 import { runSync, runRefresh, runRollback } from '../src/actions';
 import { ArgoCDHealthTab, HealthBadge } from '../src/ClusterTab';
-import { TenantProvider, type TenantState } from '@7k-inari/ui-plugin-sdk';
+import { TenantProvider, AuthProvider, type TenantState, type AuthState } from '@7k-inari/ui-plugin-sdk';
 
 const testTenant: TenantState = {
   current: { orgId: 'acme', orgName: 'Acme' },
@@ -14,8 +14,12 @@ const testTenant: TenantState = {
   switchTenant: () => {},
   onTenantChange: () => () => {},
 };
+const testAuth: AuthState = { principal: null, getToken: () => 'test-token' };
 const withTenant = (el: React.ReactElement) =>
-  createElement(TenantProvider, { value: testTenant, children: el });
+  createElement(AuthProvider, {
+    value: testAuth,
+    children: createElement(TenantProvider, { value: testTenant, children: el }),
+  });
 import { ArgoCDDeliveryBadge } from '../src/CatalogCard';
 
 const instance = {
@@ -58,6 +62,28 @@ describe('invokeAction', () => {
     expect(url).toBe('/api/extensions/inari-ext-argocd/actions/argocd.sync');
     expect((init as RequestInit).method).toBe('POST');
     expect(JSON.parse((init as RequestInit).body as string)).toEqual({ clusterId: 'cluster-1' });
+  });
+
+  it('attaches the shell bearer token once configured', async () => {
+    const { configureAuth } = await import('../src/api');
+    configureAuth(() => 'shell-token');
+    const spy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response('{"commandId":"c1","outcome":"applied"}', { status: 200 }));
+    await invokeAction('argocd.sync', {});
+    const headers = (spy.mock.calls[0][1] as RequestInit).headers as Record<string, string>;
+    expect(headers['authorization']).toBe('Bearer shell-token');
+  });
+
+  it('omits the authorization header without a token', async () => {
+    const { configureAuth } = await import('../src/api');
+    configureAuth(() => undefined);
+    const spy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response('{"commandId":"c1","outcome":"applied"}', { status: 200 }));
+    await invokeAction('argocd.sync', {});
+    const headers = (spy.mock.calls[0][1] as RequestInit).headers as Record<string, string>;
+    expect(headers['authorization']).toBeUndefined();
   });
 
   it('throws on non-2xx', async () => {
@@ -111,9 +137,22 @@ describe('components', () => {
     expect(renderToStaticMarkup(createElement(HealthBadge, { health: 'Degraded' }))).toContain('Degraded');
   });
 
+  it('ClusterTab unwraps the server list envelope', async () => {
+    const spy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(JSON.stringify({ instances: [instance] }), { status: 200 }));
+    const { listClusterInstances } = await import('../src/api');
+    const list = await listClusterInstances('acme', 'cluster-1');
+    expect(list).toHaveLength(1);
+    expect(list[0].id).toBe('ri-1');
+    // Regression: the server wraps lists in { instances }; a raw-array parse
+    // made every tab render empty.
+    expect(spy.mock.calls[0][0]).toContain('/api/v1/tenants/acme/instances');
+  });
+
   it('ClusterTab lists instances with health badges', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify([instance]), { status: 200 }),
+      new Response(JSON.stringify({ instances: [instance] }), { status: 200 }),
     );
     const { createRoot } = await import('react-dom/client');
     const { act } = await import('react');

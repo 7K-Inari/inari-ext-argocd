@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ClusterTabSlotProps } from '@7k-inari/ui-plugin-sdk';
-import { useTenant } from '@7k-inari/ui-plugin-sdk';
-import { listClusterInstances, type ResourceInstance } from './api';
+import { useAuth, useTenant } from '@7k-inari/ui-plugin-sdk';
+import { configureAuth, listClusterInstances, type ResourceInstance } from './api';
 
 const HEALTH_COLORS: Record<string, string> = {
   Healthy: '#2da44e',
@@ -34,8 +34,11 @@ export function HealthBadge({ health }: { health?: string }) {
  * resource instance on the cluster. */
 export function ArgoCDHealthTab({ cluster }: ClusterTabSlotProps) {
   const { current } = useTenant();
+  const auth = useAuth();
   const [instances, setInstances] = useState<ResourceInstance[]>([]);
   const [error, setError] = useState<string>();
+
+  useEffect(() => configureAuth(() => auth.getToken()), [auth]);
 
   useEffect(() => {
     if (!current) return;
@@ -53,13 +56,29 @@ export function ArgoCDHealthTab({ cluster }: ClusterTabSlotProps) {
       <h3>ArgoCD health — {cluster.name}</h3>
       {error && <p role="alert">Failed to load instances: {error}</p>}
       {!error && instances.length === 0 && <p>No Inari-managed instances on this cluster.</p>}
-      <ul>
-        {instances.map((i) => (
-          <li key={i.id}>
-            <strong>{i.name}</strong> {i.namespace ? `(${i.namespace}) ` : ''}
-            <HealthBadge health={i.health} />
-          </li>
-        ))}
+      <ul style={{ listStyle: 'none', padding: 0, margin: '8px 0' }}>
+        {instances.map((i) => {
+          // Server returns state/statusMessage as top-level fields.
+          const top = i as unknown as Record<string, unknown>;
+          const state = (top.state as string) ?? '';
+          const message = (top.statusMessage as string) ?? '';
+          return (
+            <li key={i.id} style={{ display: 'flex', alignItems: 'baseline', gap: 8, padding: '4px 0' }}>
+              <strong>{i.name || i.id}</strong>
+              <span style={{ color: '#6e7781', fontSize: 12 }}>{i.catalogItemId.replace(/^curated:/, '')}</span>
+              {i.namespace ? <span style={{ color: '#6e7781', fontSize: 12 }}>({i.namespace})</span> : null}
+              <HealthBadge health={i.health} />
+              {state && state !== 'running' ? (
+                <span style={{ color: '#6e7781', fontSize: 12 }}>{state}</span>
+              ) : null}
+              {message ? (
+                <span title={message} style={{ color: '#bf8700', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 360 }}>
+                  {message}
+                </span>
+              ) : null}
+            </li>
+          );
+        })}
       </ul>
     </section>
   );
