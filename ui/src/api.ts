@@ -5,11 +5,30 @@
 // extension RBAC (`extensions:invoke:inari-ext-argocd`), and proxies
 // `/api/extensions/inari-ext-argocd/*` to the backend plugin (plan §5.8).
 //
-// NOTE (SDK gap, see README): the UI SDK's ApiClient does not yet expose an
-// extension-invoke helper or token injection for remotes, so we use plain
-// fetch with credentials:"include".
+// The control plane authenticates with Bearer tokens (OIDC), not cookies:
+// remotes must attach the shell's token. Components call configureAuth from
+// an effect with the SDK's useAuth().getToken (the SDK is a host-provided
+// singleton, so this is the shell's live session).
 
 export const EXTENSION_NAME = 'inari-ext-argocd';
+
+type TokenProvider = () => Promise<string | undefined> | string | undefined;
+
+let tokenProvider: TokenProvider | null = null;
+
+/** configureAuth installs the shell's token provider (call once per mounted
+ * extension component; idempotent). */
+export function configureAuth(getToken: TokenProvider): void {
+  tokenProvider = getToken;
+}
+
+async function resolveToken(): Promise<string | undefined> {
+  if (tokenProvider) return tokenProvider();
+  // Fallback for action runners invoked outside any extension component:
+  // read the shared SDK's module-level auth state.
+  const { getAuthState } = await import('@7k-inari/ui-plugin-sdk');
+  return getAuthState()?.getToken();
+}
 
 export type { ResourceInstance } from '@7k-inari/ui-plugin-sdk';
 import type { ResourceInstance } from '@7k-inari/ui-plugin-sdk';
@@ -21,10 +40,13 @@ export interface ActionResult {
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const token = await resolveToken();
+  const headers: Record<string, string> = { 'content-type': 'application/json' };
+  if (token) headers['authorization'] = `Bearer ${token}`;
   const res = await fetch(path, {
     method,
     credentials: 'include',
-    headers: { 'content-type': 'application/json' },
+    headers,
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (!res.ok) {
@@ -43,11 +65,16 @@ export function invokeAction(action: string, payload: unknown): Promise<ActionRe
 }
 
 /** listClusterInstances reads the host's resource inventory for a cluster. */
-export function listClusterInstances(org: string, clusterId: string): Promise<ResourceInstance[]> {
-  return request<ResourceInstance[]>(
+export async function listClusterInstances(
+  org: string,
+  clusterId: string,
+): Promise<ResourceInstance[]> {
+  // The server wraps lists: { instances: [...] }.
+  const res = await request<{ instances: ResourceInstance[] | null }>(
     'GET',
     `/api/v1/tenants/${encodeURIComponent(org)}/instances?clusterId=${encodeURIComponent(clusterId)}`,
   );
+  return res.instances ?? [];
 }
 
 /** argocdAppRef extracts the ArgoCD Application identity the orchestrator

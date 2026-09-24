@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ClusterTabSlotProps } from '@7k-inari/ui-plugin-sdk';
-import { useTenant } from '@7k-inari/ui-plugin-sdk';
-import { listClusterInstances, type ResourceInstance } from './api';
+import { useAuth, useTenant } from '@7k-inari/ui-plugin-sdk';
+import { configureAuth, listClusterInstances, type ResourceInstance } from './api';
 
 const HEALTH_COLORS: Record<string, string> = {
   Healthy: '#2da44e',
@@ -34,8 +34,11 @@ export function HealthBadge({ health }: { health?: string }) {
  * resource instance on the cluster. */
 export function ArgoCDHealthTab({ cluster }: ClusterTabSlotProps) {
   const { current } = useTenant();
+  const auth = useAuth();
   const [instances, setInstances] = useState<ResourceInstance[]>([]);
   const [error, setError] = useState<string>();
+
+  useEffect(() => configureAuth(() => auth.getToken()), [auth]);
 
   useEffect(() => {
     if (!current) return;

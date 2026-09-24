@@ -6,7 +6,7 @@ import extension from '../src/index';
 import { invokeAction, argocdAppRef } from '../src/api';
 import { runSync, runRefresh, runRollback } from '../src/actions';
 import { ArgoCDHealthTab, HealthBadge } from '../src/ClusterTab';
-import { TenantProvider, type TenantState } from '@7k-inari/ui-plugin-sdk';
+import { TenantProvider, AuthProvider, type TenantState, type AuthState } from '@7k-inari/ui-plugin-sdk';
 
 const testTenant: TenantState = {
   current: { orgId: 'acme', orgName: 'Acme' },
@@ -14,8 +14,12 @@ const testTenant: TenantState = {
   switchTenant: () => {},
   onTenantChange: () => () => {},
 };
+const testAuth: AuthState = { principal: null, getToken: () => 'test-token' };
 const withTenant = (el: React.ReactElement) =>
-  createElement(TenantProvider, { value: testTenant, children: el });
+  createElement(AuthProvider, {
+    value: testAuth,
+    children: createElement(TenantProvider, { value: testTenant, children: el }),
+  });
 import { ArgoCDDeliveryBadge } from '../src/CatalogCard';
 
 const instance = {
@@ -113,7 +117,7 @@ describe('components', () => {
 
   it('ClusterTab lists instances with health badges', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify([instance]), { status: 200 }),
+      new Response(JSON.stringify({ instances: [instance] }), { status: 200 }),
     );
     const { createRoot } = await import('react-dom/client');
     const { act } = await import('react');
