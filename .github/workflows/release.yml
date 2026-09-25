@@ -42,7 +42,9 @@ jobs:
           PATHS='${{ steps.rp.outputs.paths_released }}'
           echo "released paths: $PATHS"
           for p in $(jq -r '.[]' <<< "$PATHS"); do
-            tag="$(jq -r --arg p "$p" '.[$p + "--tag_name"] // empty' <<< "$OUTS")"
+            # release-please emits the root path "." under the unprefixed
+            # key "tag_name" (not ".--tag_name"); other paths use "<path>--tag_name".
+            tag="$(jq -r --arg p "$p" 'if $p == "." then .tag_name // empty else .[$p + "--tag_name"] // empty end' <<< "$OUTS")"
             echo "$p -> $tag"
             case "$p" in
               ".")  echo "backend_released=true" >> "$GITHUB_OUTPUT"; echo "backend_version=${tag#v}" >> "$GITHUB_OUTPUT";;
@@ -61,10 +63,12 @@ jobs:
       contents: read
       packages: write
       id-token: write
-    env:
-      IMAGE: ghcr.io/${{ github.repository }}
     steps:
       - uses: actions/checkout@v4
+      - name: Compute lowercase image name
+        # github.repository preserves the org's casing ("7K-Inari"), but
+        # docker tags must be lowercase.
+        run: echo "IMAGE=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
       - name: Check for Dockerfile (scaffold lands in M4-W3)
         id: dockerfile
         run: |
