@@ -3,7 +3,6 @@
   "separate-pull-requests": false,
   "packages": {
     ".": {
-      "component": "inari-ext-argocd",
       "release-type": "go",
       "include-component-in-tag": false,
       "changelog-path": "CHANGELOG.md"
