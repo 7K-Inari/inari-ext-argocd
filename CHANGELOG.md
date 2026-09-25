@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.1](https://github.com/7K-Inari/inari-ext-argocd/compare/v0.3.0...v0.3.1) (2026-09-25)
+
+
+### Bug Fixes
+
+* **ci:** repair backend image publish in release workflow ([db90785](https://github.com/7K-Inari/inari-ext-argocd/commit/db9078534483055d91d14a87a78949250c4ca10c))
+* **ci:** repair backend image publish in release workflow ([1bae949](https://github.com/7K-Inari/inari-ext-argocd/commit/1bae94934e185f3bee3981ec147ba85309ea1d89))
+
 ## [0.3.0](https://github.com/7K-Inari/inari-ext-argocd/compare/v0.2.0...v0.3.0) (2026-09-24)
 
 
