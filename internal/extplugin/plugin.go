@@ -216,7 +216,9 @@ func downstreamToken(ctx context.Context) (string, bool) {
 	if scheme, rest, found := strings.Cut(tok, " "); found && strings.EqualFold(scheme, "bearer") {
 		tok = strings.TrimSpace(rest)
 	}
-	if tok == "" {
+	// A bare scheme word ("Bearer" with no credential) is not a token:
+	// fail closed rather than forward it downstream as credential material.
+	if tok == "" || strings.EqualFold(tok, "bearer") {
 		return "", false
 	}
 	return tok, true

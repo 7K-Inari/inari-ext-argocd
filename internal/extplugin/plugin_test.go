@@ -72,17 +72,28 @@ func invokeWithSession(t *testing.T, c *testkit.Client, action string, payload a
 }
 
 // TestDownstreamTokenSchemeStripping proves the gateway hop receives the
-// raw token regardless of how the injected credential was schemed/cased.
+// raw token regardless of how the injected credential was schemed/cased,
+// and that a scheme-only value (no credential material) fails closed.
 func TestDownstreamTokenSchemeStripping(t *testing.T) {
 	payload := map[string]any{
 		"clusterId": "cluster-1",
 		"app":       map[string]any{"name": "a", "namespace": "argocd", "project": "inari"},
 	}
-	for _, tc := range []struct{ name, injected, want string }{
-		{"bearer", "Bearer tok-1", "tok-1"},
-		{"bearer lowercase", "bearer tok-2", "tok-2"},
-		{"bearer uppercase", "BEARER tok-3", "tok-3"},
-		{"raw token, no scheme", "tok-4", "tok-4"},
+	for _, tc := range []struct {
+		name       string
+		injected   string
+		want       string
+		wantReauth bool
+	}{
+		{"bearer", "Bearer tok-1", "tok-1", false},
+		{"bearer lowercase", "bearer tok-2", "tok-2", false},
+		{"bearer uppercase", "BEARER tok-3", "tok-3", false},
+		{"raw token, no scheme", "tok-4", "tok-4", false},
+		{"double space after scheme", "Bearer  tok-5", "tok-5", false},
+		{"scheme only, no token", "Bearer", "", true},
+		{"scheme only lowercase", "bearer", "", true},
+		{"scheme + trailing space", "Bearer ", "", true},
+		{"whitespace only", " ", "", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			gw := &fakeGateway{ack: &agentv1.CommandAck{CommandId: "cmd-1", Result: agentv1.CommandResult_COMMAND_RESULT_APPLIED}}
@@ -97,8 +108,19 @@ func TestDownstreamTokenSchemeStripping(t *testing.T) {
 				pluginsdk.HeaderAuthMethod, pluginsdk.AuthMethodOIDCSSOSession.String(),
 				pluginsdk.HeaderDownstreamAuthorization, tc.injected,
 			)
-			if _, err := c.Invoke(ctx, argocd.ActionSync, testAuth, b); err != nil {
-				t.Fatalf("Invoke: %v", err)
+			_, err = c.Invoke(ctx, argocd.ActionSync, testAuth, b)
+			if tc.wantReauth {
+				var pe *pluginsdk.Error
+				if !errors.As(err, &pe) || pe.Code != pluginsdk.CodeUnauthenticated {
+					t.Fatalf("injected %q: expected fail-closed reauth, got err=%v hop token=%q", tc.injected, err, gw.last.UserToken)
+				}
+				if gw.last.Command != nil {
+					t.Fatal("gateway must not be called without credential material")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("injected %q: %v", tc.injected, err)
 			}
 			if gw.last.UserToken != tc.want {
 				t.Fatalf("injected %q: want raw token %q on the hop, got %q", tc.injected, tc.want, gw.last.UserToken)
