@@ -20,7 +20,7 @@ func invokeRaw(t *testing.T, action string, auth pluginsdk.AuthContext, payload 
 	c, _, _, _ := startStack(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	_, err := c.Invoke(ctx, action, auth, payload)
+	_, err := c.Invoke(withUserSession(ctx, "sso-token-edge"), action, auth, payload)
 	return err
 }
 
@@ -97,7 +97,7 @@ func TestSlowAgentErrorSemantics(t *testing.T) {
 	})
 	ctx, cancel2 := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel2()
-	_, err := c.Invoke(ctx, argocd.ActionSync, auth, payload)
+	_, err := c.Invoke(withUserSession(ctx, "sso-token-edge"), argocd.ActionSync, auth, payload)
 	var pe *pluginsdk.Error
 	if !errors.As(err, &pe) {
 		t.Fatalf("want pluginsdk.Error, got %v", err)
@@ -120,7 +120,7 @@ func TestConcurrentInvokesNoCrossTalk(t *testing.T) {
 			})
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
-			_, errs[i] = c.Invoke(ctx, argocd.ActionRefresh, auth, payload)
+			_, errs[i] = c.Invoke(withUserSession(ctx, "sso-token-edge"), argocd.ActionRefresh, auth, payload)
 		}(i)
 	}
 	wg.Wait()
@@ -161,7 +161,7 @@ func TestAgentFailedAckPropagatesMessage(t *testing.T) {
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	_, err := c.Invoke(ctx, argocd.ActionSync, auth, payload)
+	_, err := c.Invoke(withUserSession(ctx, "sso-token-edge"), argocd.ActionSync, auth, payload)
 	var pe *pluginsdk.Error
 	if !errors.As(err, &pe) {
 		t.Fatalf("want pluginsdk.Error, got %v", err)
