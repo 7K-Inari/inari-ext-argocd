@@ -1,6 +1,7 @@
 package extplugin
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -157,35 +158,12 @@ func TestForwardsUserTokenAsMetadataOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal command: %v", err)
 	}
-	if json.Valid(raw) && false {
-		t.Fatal("unreachable")
-	}
-	if contains(raw, token) {
+	if bytes.Contains(raw, []byte(token)) {
 		t.Fatal("user token leaked into the command payload")
 	}
 	if gw.last.Command.GetUserCredentialRef() != "" {
 		t.Fatalf("extension must not self-assert user_credential_ref, got %q", gw.last.Command.GetUserCredentialRef())
 	}
-}
-
-func contains(raw []byte, s string) bool {
-	return len(s) > 0 && len(raw) >= len(s) && string(raw) != "" && indexOf(raw, []byte(s)) >= 0
-}
-
-func indexOf(haystack, needle []byte) int {
-	for i := 0; i+len(needle) <= len(haystack); i++ {
-		match := true
-		for j := range needle {
-			if haystack[i+j] != needle[j] {
-				match = false
-				break
-			}
-		}
-		if match {
-			return i
-		}
-	}
-	return -1
 }
 
 func TestExpiredDownstreamSessionSignalsReauth(t *testing.T) {

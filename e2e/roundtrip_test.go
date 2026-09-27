@@ -86,10 +86,8 @@ func (r *cmdRecorder) last() *agentv1.InvokeAction {
 }
 
 func startStack(t *testing.T) (*testkit.Client, *fakeArgoCD, *harness.Server, func()) {
-	rec := &cmdRecorder{}
-	c, fake, gw, cancel := startStackWithRecorder(t, rec)
-	_ = rec
-	return c, fake, gw, cancel
+	t.Helper()
+	return startStackWithRecorder(t, &cmdRecorder{})
 }
 
 func startStackWithRecorder(t *testing.T, rec *cmdRecorder) (*testkit.Client, *fakeArgoCD, *harness.Server, func()) {

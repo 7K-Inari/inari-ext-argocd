@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"bytes"
 	"context"
 	"net"
 	"testing"
@@ -116,31 +117,12 @@ func TestUserTokenNeverEntersCommandPayload(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	if containsBytes(raw, []byte(token)) {
+	if bytes.Contains(raw, []byte(token)) {
 		t.Fatalf("user token leaked into the persisted command payload: %q", raw)
 	}
 	if cap.cmd.GetUserCredentialRef() != "" {
 		t.Fatalf("extension must not self-assert user_credential_ref, got %q", cap.cmd.GetUserCredentialRef())
 	}
-}
-
-func containsBytes(haystack, needle []byte) bool {
-	if len(needle) == 0 || len(haystack) < len(needle) {
-		return false
-	}
-	for i := 0; i+len(needle) <= len(haystack); i++ {
-		match := true
-		for j := range needle {
-			if haystack[i+j] != needle[j] {
-				match = false
-				break
-			}
-		}
-		if match {
-			return true
-		}
-	}
-	return false
 }
 
 func TestLegacyGateTokenDisabledByDefault(t *testing.T) {
