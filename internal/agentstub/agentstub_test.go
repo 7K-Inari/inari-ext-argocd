@@ -14,6 +14,8 @@ import (
 	agentv1 "github.com/7K-Inari/inari-api/gen/go/inari/agent/v1"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/structpb"
+
+	"github.com/7K-Inari/inari-ext-argocd/internal/argocd"
 )
 
 type recordedCall struct {
@@ -222,5 +224,24 @@ func TestAppNameIsPathEscaped(t *testing.T) {
 	managedClient(srv).Execute(context.Background(), cmd(t, "sync", p))
 	if rec.last().url != "/api/v1/applications/a%2Fb/sync" {
 		t.Fatalf("url: %s", rec.last().url)
+	}
+}
+
+func TestUnauthorizedSurfacesReauthSignal(t *testing.T) {
+	for _, status := range []int{http.StatusUnauthorized, http.StatusForbidden} {
+		rec := &recordingServer{status: status}
+		srv := httptest.NewServer(rec.handler())
+		c := cmd(t, "sync", managedAppParams())
+		ack := managedClient(srv).Execute(context.Background(), c)
+		srv.Close()
+		if ack.GetResult() != agentv1.CommandResult_COMMAND_RESULT_FAILED {
+			t.Fatalf("status %d: expected FAILED, got %v", status, ack.GetResult())
+		}
+		if !strings.HasPrefix(ack.GetMessage(), argocd.ReauthSignalPrefix) {
+			t.Fatalf("status %d: expected re-auth signal prefix, got %q", status, ack.GetMessage())
+		}
+		if strings.Contains(ack.GetMessage(), "tok") {
+			t.Fatalf("status %d: credential material leaked into ack message: %q", status, ack.GetMessage())
+		}
 	}
 }
