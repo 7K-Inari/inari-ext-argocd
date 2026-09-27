@@ -21,6 +21,8 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 
 	agentv1 "github.com/7K-Inari/inari-api/gen/go/inari/agent/v1"
+
+	"github.com/7K-Inari/inari-ext-argocd/internal/argocd"
 )
 
 // ArgoCDClient talks to one tenant-local ArgoCD API.
@@ -166,6 +168,19 @@ func (c *ArgoCDClient) do(ctx context.Context, method, path string, body any) er
 		return fmt.Errorf("argocd api: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		// The per-user downstream (ArgoCD) session is expired or
+		// unauthorized: signal re-auth with the typed prefix so the
+		// extension surfaces CodeUnauthenticated + reauth details and the
+		// UI can bootstrap SSO and retry once. 403 is included deliberately:
+		// ArgoCD instances with anonymous access enabled answer invalid or
+		// expired tokens with 403 (treated as anonymous), so 403 cannot be
+		// assumed to be a mere RBAC denial; the worst case for a true RBAC
+		// denial is one extra SSO bootstrap, bounded by the UI's
+		// retry-once. Never echo the body here — ArgoCD error bodies may
+		// reflect request material.
+		return fmt.Errorf("%s: argocd session expired or unauthorized (%s)", argocd.ReauthSignalPrefix, resp.Status)
+	}
 	if resp.StatusCode >= 300 {
 		b, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
 		return fmt.Errorf("argocd api %s %s: %s: %s", method, path, resp.Status, string(b))

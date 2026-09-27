@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	agentv1 "github.com/7K-Inari/inari-api/gen/go/inari/agent/v1"
@@ -52,7 +53,19 @@ type Result struct {
 
 // Build creates the plugin with all ArgoCD actions registered.
 func Build(cfg Config) (*pluginsdk.Plugin, error) {
-	p := pluginsdk.New(Info, pluginsdk.WithHealthChecker(health{cfg.Gateway}))
+	p := pluginsdk.New(Info,
+		pluginsdk.WithHealthChecker(health{cfg.Gateway}),
+		// Downstream auth declaration (plan §5.8, extension OIDC
+		// pass-through): the control plane resolves the caller's per-user
+		// ArgoCD SSO session and injects it as connection metadata;
+		// credentials never travel inside AuthContext and the SDK fails
+		// closed when no credential is injected.
+		pluginsdk.WithAuthMethods(pluginsdk.AuthMethod{
+			Type:      pluginsdk.AuthMethodOIDCSSOSession,
+			Audience:  argocd.SSOProvider,
+			IsDefault: true,
+		}),
+	)
 	for _, a := range []pluginsdk.Action{
 		{
 			Name:         argocd.ActionSync,
@@ -100,6 +113,16 @@ func handle(cfg Config, action string) pluginsdk.Handler {
 		ac, ok := pluginsdk.AuthContextFrom(ctx)
 		if !ok {
 			return nil, pluginsdk.Errorf(pluginsdk.CodeUnauthenticated, "missing auth context")
+		}
+
+		// Per-user downstream credential (oidc-sso-session), injected by the
+		// control plane as connection metadata. Fail closed when absent —
+		// no silent fallback to shared credentials. (The SDK already
+		// enforces this against the declared auth methods; this is defense
+		// in depth with the typed re-auth signal.)
+		userToken, ok := downstreamToken(ctx)
+		if !ok {
+			return nil, reauthError("no user session available")
 		}
 
 		// The tunnel correlates acks by command ID; never send an empty one
@@ -150,6 +173,7 @@ func handle(cfg Config, action string) pluginsdk.Handler {
 			TenantID:  ac.TenantID,
 			ClusterID: clusterID,
 			Command:   cmd,
+			UserToken: userToken,
 		})
 		if err != nil {
 			// Gateway unreachable or agent disconnected: fail closed.
@@ -162,6 +186,12 @@ func handle(cfg Config, action string) pluginsdk.Handler {
 		case agentv1.CommandResult_COMMAND_RESULT_ACCEPTED:
 			res.Outcome = "accepted"
 		default:
+			// The agent reports an expired/unauthorized per-user ArgoCD
+			// session with the re-auth signal prefix; surface it as a typed
+			// re-auth error so the UI can bootstrap SSO and retry once.
+			if strings.HasPrefix(ack.GetMessage(), argocd.ReauthSignalPrefix) {
+				return nil, reauthError("downstream session expired or unauthorized")
+			}
 			return nil, pluginsdk.Errorf(pluginsdk.CodeInternal, "%s failed on agent: %s", action, ack.GetMessage())
 		}
 		out, err := json.Marshal(res)
@@ -169,6 +199,42 @@ func handle(cfg Config, action string) pluginsdk.Handler {
 			return nil, pluginsdk.Errorf(pluginsdk.CodeInternal, "encode result: %v", err)
 		}
 		return &pluginsdk.Response{Result: out}, nil
+	}
+}
+
+// downstreamToken extracts the raw per-user downstream credential from the
+// host-injected connection metadata, stripping any Bearer scheme prefix
+// (case-insensitive per RFC 7235; the gateway hop carries the raw token,
+// not an Authorization header value). The returned value is a credential:
+// never log it.
+func downstreamToken(ctx context.Context) (string, bool) {
+	tok, ok := pluginsdk.DownstreamToken(ctx)
+	if !ok {
+		return "", false
+	}
+	tok = strings.TrimSpace(tok)
+	if scheme, rest, found := strings.Cut(tok, " "); found && strings.EqualFold(scheme, "bearer") {
+		tok = strings.TrimSpace(rest)
+	}
+	// A bare scheme word ("Bearer" with no credential) is not a token:
+	// fail closed rather than forward it downstream as credential material.
+	if tok == "" || strings.EqualFold(tok, "bearer") {
+		return "", false
+	}
+	return tok, true
+}
+
+// reauthError is the typed re-auth/session-expired signal (plan: extension
+// OIDC pass-through): the UI detects details.code=reauth_required and drives
+// the zero-prompt SSO bootstrap, then retries once.
+func reauthError(msg string) *pluginsdk.Error {
+	return &pluginsdk.Error{
+		Code:    pluginsdk.CodeUnauthenticated,
+		Message: "re-authentication required: " + msg,
+		Details: map[string]string{
+			"code":     argocd.ReauthSignalPrefix,
+			"provider": argocd.SSOProvider,
+		},
 	}
 }
 

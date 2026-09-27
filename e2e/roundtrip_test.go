@@ -20,11 +20,14 @@ import (
 	"testing"
 	"time"
 
+	agentv1 "github.com/7K-Inari/inari-api/gen/go/inari/agent/v1"
 	pluginsdk "github.com/7K-Inari/inari-plugin-sdk"
 	"github.com/7K-Inari/inari-plugin-sdk/testkit"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/test/bufconn"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/7K-Inari/inari-ext-argocd/e2e/harness"
 	"github.com/7K-Inari/inari-ext-argocd/internal/agentstub"
@@ -57,7 +60,37 @@ func (f *fakeArgoCD) calls() []string {
 	return append([]string{}, f.hits...)
 }
 
+// cmdRecorder wraps the agent executor and records every command the agent
+// received (post-gateway, i.e. what would be persisted/dispatched).
+type cmdRecorder struct {
+	mu   sync.Mutex
+	cmds []*agentv1.InvokeAction
+}
+
+func (r *cmdRecorder) wrap(exec func(context.Context, *agentv1.InvokeAction) *agentv1.CommandAck) func(context.Context, *agentv1.InvokeAction) *agentv1.CommandAck {
+	return func(ctx context.Context, cmd *agentv1.InvokeAction) *agentv1.CommandAck {
+		r.mu.Lock()
+		r.cmds = append(r.cmds, cmd)
+		r.mu.Unlock()
+		return exec(ctx, cmd)
+	}
+}
+
+func (r *cmdRecorder) last() *agentv1.InvokeAction {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if len(r.cmds) == 0 {
+		return nil
+	}
+	return r.cmds[len(r.cmds)-1]
+}
+
 func startStack(t *testing.T) (*testkit.Client, *fakeArgoCD, *harness.Server, func()) {
+	t.Helper()
+	return startStackWithRecorder(t, &cmdRecorder{})
+}
+
+func startStackWithRecorder(t *testing.T, rec *cmdRecorder) (*testkit.Client, *fakeArgoCD, *harness.Server, func()) {
 	t.Helper()
 	fake := &fakeArgoCD{}
 	argoSrv := httptest.NewServer(fake.handler())
@@ -87,7 +120,7 @@ func startStack(t *testing.T) (*testkit.Client, *fakeArgoCD, *harness.Server, fu
 	t.Cleanup(cancel)
 	sess, _ := gwSrv.RegisterAgent("cluster-1")
 	argo := &agentstub.ArgoCDClient{BaseURL: argoSrv.URL, ManagedProjects: []string{"inari"}}
-	go harness.RunAgent(ctx, sess, argo.Execute)
+	go harness.RunAgent(ctx, sess, rec.wrap(argo.Execute))
 
 	p, err := extplugin.Build(extplugin.Config{
 		Gateway: gateway.New(conn),
@@ -100,6 +133,15 @@ func startStack(t *testing.T) (*testkit.Client, *fakeArgoCD, *harness.Server, fu
 }
 
 func scopingForTest() argocd.Scoping { return argocd.Scoping{ManagedProjects: []string{"inari"}} }
+
+// withUserSession mimics the control plane's extension proxy injecting the
+// per-user SSO session credential (oidc-sso-session) as connection metadata.
+func withUserSession(ctx context.Context, token string) context.Context {
+	return metadata.AppendToOutgoingContext(ctx,
+		pluginsdk.HeaderAuthMethod, pluginsdk.AuthMethodOIDCSSOSession.String(),
+		pluginsdk.HeaderDownstreamAuthorization, "Bearer "+token,
+	)
+}
 
 func TestEndToEndRoundTrip(t *testing.T) {
 	c, fake, _, _ := startStack(t)
@@ -128,7 +170,7 @@ func TestEndToEndRoundTrip(t *testing.T) {
 
 	for _, step := range steps {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		resp, err := c.Invoke(ctx, step.action, auth, payload(step.payload))
+		resp, err := c.Invoke(withUserSession(ctx, "sso-token-dev-1"), step.action, auth, payload(step.payload))
 		cancel()
 		if err != nil {
 			t.Fatalf("%s: %v", step.action, err)
@@ -164,9 +206,70 @@ func TestFailsClosedWhenAgentDisconnected(t *testing.T) {
 	})
 	ctx, cancel2 := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel2()
-	_, err := c.Invoke(ctx, argocd.ActionSync, auth, payload)
+	_, err := c.Invoke(withUserSession(ctx, "sso-token-dev-1"), argocd.ActionSync, auth, payload)
 	var pe *pluginsdk.Error
 	if err == nil || !errors.As(err, &pe) || pe.Code != pluginsdk.CodeUnavailable {
 		t.Fatalf("expected CodeUnavailable when agent disconnected, got %v", err)
+	}
+}
+
+// TestUserCredentialBecomesRefBeforeAgent proves the W2/W3 no-leak
+// invariant end to end: the per-user token crosses the extension→gateway
+// hop as metadata, and the command the agent executes carries only a vault
+// reference — never the raw token.
+func TestUserCredentialBecomesRefBeforeAgent(t *testing.T) {
+	rec := &cmdRecorder{}
+	c, fake, _, _ := startStackWithRecorder(t, rec)
+	auth := pluginsdk.AuthContext{PrincipalID: "dev-1", TenantID: "tenant-acme"}
+	payload, _ := json.Marshal(map[string]any{
+		"clusterId": "cluster-1",
+		"app":       map[string]any{"name": "web-shop", "namespace": "argocd", "project": "inari"},
+	})
+	const token = "unique-sso-token-dev-1"
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if _, err := c.Invoke(withUserSession(ctx, token), argocd.ActionSync, auth, payload); err != nil {
+		t.Fatalf("Invoke: %v", err)
+	}
+	cmd := rec.last()
+	if cmd == nil {
+		t.Fatal("agent never received the command")
+	}
+	if cmd.GetUserCredentialRef() == "" {
+		t.Fatal("expected the gateway to stamp a user credential reference")
+	}
+	raw, _ := proto.Marshal(cmd)
+	if strings.Contains(string(raw), token) {
+		t.Fatal("raw user token leaked into the dispatched command payload")
+	}
+	if strings.Contains(cmd.GetUserCredentialRef(), token) {
+		t.Fatal("credential reference must not contain token material")
+	}
+	for _, h := range fake.calls() {
+		if strings.Contains(h, token) {
+			t.Fatalf("raw user token reached the tenant-local API: %q", h)
+		}
+	}
+}
+
+// TestFailsClosedWithoutUserSession proves there is no silent fallback to
+// shared credentials: without an injected per-user session every action is
+// rejected before any gateway hop.
+func TestFailsClosedWithoutUserSession(t *testing.T) {
+	c, fake, _, _ := startStack(t)
+	auth := pluginsdk.AuthContext{PrincipalID: "dev-1", TenantID: "tenant-acme"}
+	payload, _ := json.Marshal(map[string]any{
+		"clusterId": "cluster-1",
+		"app":       map[string]any{"name": "web-shop", "namespace": "argocd", "project": "inari"},
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := c.Invoke(ctx, argocd.ActionSync, auth, payload)
+	var pe *pluginsdk.Error
+	if err == nil || !errors.As(err, &pe) || pe.Code != pluginsdk.CodeUnauthenticated {
+		t.Fatalf("expected CodeUnauthenticated without a user session, got %v", err)
+	}
+	if len(fake.calls()) != 0 {
+		t.Fatalf("no downstream call may happen without a user session; hits: %v", fake.calls())
 	}
 }

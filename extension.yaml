@@ -36,6 +36,17 @@ spec:
       - { kind: instance-action, name: argocd-refresh }
       - { kind: instance-action, name: argocd-rollback }
 
+  # Downstream auth declaration (plan §5.8, plugin.v1 AuthMethod): the
+  # control plane resolves the caller's per-user ArgoCD SSO session
+  # (oidc-sso-session; `audience` names the session provider key) and
+  # injects it as connection metadata. Credentials never travel inside
+  # AuthContext; missing/expired sessions fail closed with a re-auth signal.
+  auth:
+    methods:
+      - type: oidc-sso-session
+        audience: argocd
+        isDefault: true
+
   # RBAC surface (plan §5.8): the control plane requires callers to hold
   # `extensions, invoke, inari-ext-argocd` before proxying any action.
   permissions:

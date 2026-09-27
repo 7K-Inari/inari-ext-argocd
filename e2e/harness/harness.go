@@ -127,6 +127,13 @@ func (s *Server) invoke(ctx context.Context, cmd *agentv1.InvokeAction) (*agentv
 		sess.mu.Unlock()
 		return nil, status.Errorf(codes.Aborted, "duplicate commandId %q already in flight", cmd.GetCommandId())
 	}
+	// Per-user credential (W2/W3 contract mirror): the raw token arrives as
+	// x-inari-user-credential hop metadata; the control plane mints a vault
+	// reference and only that reference reaches the persisted/dispatched
+	// command payload. The raw token never crosses to the agent.
+	if cred := first(md[gateway.MetadataUserCredential]); cred != "" {
+		cmd.UserCredentialRef = "vaultref/" + cmd.GetCommandId()
+	}
 	sess.acks[cmd.GetCommandId()] = ch
 	sess.mu.Unlock()
 	defer func() {

@@ -28,6 +28,19 @@ const (
 // DefaultTimeout bounds one imperative round-trip through the agent.
 const DefaultTimeout = 60 * time.Second
 
+// ReauthSignalPrefix prefixes agent-reported failure messages that mean the
+// per-user downstream (ArgoCD) session is expired or unauthorized (HTTP
+// 401/403 at the tenant-local ArgoCD API). The extension maps such failures
+// to a typed re-auth error (CodeUnauthenticated + details) so the UI can
+// drive the zero-prompt SSO bootstrap and retry once. It carries no token
+// material.
+const ReauthSignalPrefix = "reauth_required"
+
+// SSOProvider is the session-store provider key for this extension's
+// oidc-sso-session declaration (server resolves the per-user session under
+// it; plugin.v1 AuthMethod.audience).
+const SSOProvider = "argocd"
+
 var (
 	dns1123 = regexp.MustCompile(`^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$`)
 	// Lua resource action names in ArgoCD are lowercase/dashed identifiers.

@@ -28,6 +28,7 @@ import (
 	pluginv1 "github.com/7K-Inari/inari-api/gen/go/inari/plugin/v1"
 	"github.com/7K-Inari/inari-api/gen/go/inari/plugin/v1/pluginv1connect"
 	pluginsdk "github.com/7K-Inari/inari-plugin-sdk"
+	"google.golang.org/grpc/metadata"
 
 	"github.com/7K-Inari/inari-ext-argocd/internal/argocd"
 	"github.com/7K-Inari/inari-ext-argocd/internal/extplugin"
@@ -47,10 +48,11 @@ func run() error {
 	}
 	if addr := os.Getenv("INARI_AGENT_GATEWAY_ADDR"); addr != "" {
 		gw, err := gateway.Dial(gateway.Config{
-			Addr:          addr,
-			Insecure:      os.Getenv("INARI_AGENT_GATEWAY_INSECURE") == "true",
-			TLSServerName: os.Getenv("INARI_AGENT_GATEWAY_TLS_NAME"),
-			Token:         os.Getenv("INARI_EXTENSION_GATEWAY_TOKEN"),
+			Addr:               addr,
+			Insecure:           os.Getenv("INARI_AGENT_GATEWAY_INSECURE") == "true",
+			TLSServerName:      os.Getenv("INARI_AGENT_GATEWAY_TLS_NAME"),
+			LegacyToken:        legacyGateToken(),
+			LegacyTokenEnabled: legacyGateTokenEnabled(),
 		})
 		if err != nil {
 			return err
@@ -125,6 +127,19 @@ func (a connectAdapter) HealthCheck(ctx context.Context, req *connect.Request[pl
 	return connect.NewResponse(r), nil
 }
 
+// Host-injected headers carrying the resolved per-user downstream
+// credential (oidc-sso-session). Set only by the control plane's extension
+// proxy (strip-then-inject); mirrored here into the contract's connection
+// metadata. Values are credentials: never log them.
+const (
+	headerAuthMethod              = "X-Inari-Auth-Method"
+	headerDownstreamAuthorization = "X-Inari-Downstream-Authorization"
+	// headerReauth signals which third-party provider the user must
+	// re-authenticate with (oidc-sso-session bootstrap/expiry) — same
+	// contract as the control plane's extension proxy.
+	headerReauth = "X-Inari-Reauth"
+)
+
 // actionsHandler maps the proxy-forwarded POST /actions/<action> onto the
 // contract's Invoke, lifting identity from the injected headers (never from
 // the payload — §5.8).
@@ -148,7 +163,22 @@ func actionsHandler(p *pluginsdk.Plugin) http.HandlerFunc {
 		if len(payload) == 0 {
 			payload = []byte("{}")
 		}
-		resp, err := s.Invoke(r.Context(), &pluginv1.InvokeRequest{
+		ctx := r.Context()
+		// Forward the host-injected downstream credential as connection
+		// metadata (the SDK enforces the declared auth method fail-closed).
+		if v := r.Header.Get(headerAuthMethod); v != "" {
+			ctx = metadata.AppendToOutgoingContext(ctx, pluginsdk.HeaderAuthMethod, v)
+		}
+		if v := r.Header.Get(headerDownstreamAuthorization); v != "" {
+			ctx = metadata.AppendToOutgoingContext(ctx, pluginsdk.HeaderDownstreamAuthorization, v)
+		}
+		// The contract service is invoked in-process here: bridge the
+		// outgoing metadata to incoming so the SDK sees the connection
+		// metadata exactly as it would over the wire.
+		if md, ok := metadata.FromOutgoingContext(ctx); ok {
+			ctx = metadata.NewIncomingContext(ctx, md)
+		}
+		resp, err := s.Invoke(ctx, &pluginv1.InvokeRequest{
 			Action: action,
 			AuthContext: &pluginv1.AuthContext{
 				PrincipalId: r.Header.Get("X-Inari-User"),
@@ -162,6 +192,16 @@ func actionsHandler(p *pluginsdk.Plugin) http.HandlerFunc {
 			return
 		}
 		if pe := resp.GetError(); pe != nil {
+			// Typed re-auth/session-expired signal: byte-identical shape to
+			// the control plane's extension proxy so the UI's zero-prompt
+			// SSO bootstrap + single retry works uniformly in dial mode.
+			if pe.GetCode() == pluginv1.ErrorCode_ERROR_CODE_UNAUTHENTICATED {
+				w.Header().Set(headerReauth, argocd.SSOProvider)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusUnauthorized)
+				_, _ = w.Write([]byte(`{"detail":"re-authentication required","code":"` + argocd.ReauthSignalPrefix + `"}`))
+				return
+			}
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(httpStatusFor(pe.GetCode()))
 			_, _ = w.Write([]byte(`{"detail":"` + jsonEscape(pe.GetMessage()) + `","code":"` + pe.GetCode().String() + `"}`))
@@ -194,6 +234,24 @@ func httpStatusFor(c pluginv1.ErrorCode) int {
 func jsonEscape(s string) string {
 	r := strings.NewReplacer(`\`, `\\`, `"`, `\"`, "\n", `\n`)
 	return r.Replace(s)
+}
+
+// legacyGateToken returns the deprecated shared extension-gateway gate token
+// (pre-W2 control planes). Inert unless legacyGateTokenEnabled is true.
+func legacyGateToken() string { return os.Getenv("INARI_EXTENSION_GATEWAY_TOKEN") }
+
+// legacyGateTokenEnabled reports whether the deprecated shared gate token
+// path was explicitly opted into (INARI_LEGACY_GATEWAY_TOKEN=true). Default
+// off: per-user OIDC SSO sessions are the supported auth path and there is
+// no silent fallback to shared credentials.
+func legacyGateTokenEnabled() bool {
+	if os.Getenv("INARI_LEGACY_GATEWAY_TOKEN") != "true" {
+		return false
+	}
+	if os.Getenv("INARI_EXTENSION_GATEWAY_TOKEN") != "" {
+		log.Print("WARNING: INARI_LEGACY_GATEWAY_TOKEN=true: using the deprecated shared extension gate token (pre-W2 compatibility); migrate the control plane to per-user OIDC SSO sessions")
+	}
+	return true
 }
 
 func managedProjects() []string {
