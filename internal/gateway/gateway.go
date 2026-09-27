@@ -42,7 +42,18 @@ const (
 	MetadataCluster = "x-inari-cluster"
 	// MetadataToken carries the shared extension-gateway gate token
 	// (server: INARI_EXTENSION_GATEWAY_TOKEN; empty = endpoint disabled).
+	//
+	// Deprecated: legacy pre-W2 authentication. Per-user OIDC SSO sessions
+	// (MetadataUserCredential) replaced it; the gate token is only sent when
+	// explicitly enabled via WithLegacyGateTokenEnabled for rolling server
+	// upgrades, and is never a fallback when no user session exists.
 	MetadataToken = "x-inari-extension-token"
+	// MetadataUserCredential carries the raw per-user downstream credential
+	// (from the host-injected X-Inari-Downstream-Authorization) over the
+	// in-memory extension→gateway hop. The control plane mints a vault
+	// reference for it; the persisted command payload carries only that
+	// reference. The token is never logged and never persisted here.
+	MetadataUserCredential = "x-inari-user-credential"
 )
 
 // contentSubtype selects the protojson codec registered below.
@@ -84,6 +95,12 @@ type Request struct {
 	ClusterID string
 	// Command is the agentv1 command to deliver to the cluster's agent.
 	Command *agentv1.InvokeAction
+	// UserToken is the raw per-user downstream credential for this call,
+	// forwarded only as MetadataUserCredential hop metadata — never inside
+	// Command (the persisted payload) and never logged. Empty when the host
+	// injected no user session; the control plane fails closed upstream in
+	// that case.
+	UserToken string
 }
 
 // Gateway delivers imperative commands to tenant-cluster agents via the
@@ -101,16 +118,39 @@ type Config struct {
 	Insecure bool
 	// TLSServerName overrides the TLS server name when set.
 	TLSServerName string
-	// Token is the shared extension-gateway gate token, sent as
-	// x-inari-extension-token. Optional: only needed when the control plane
-	// has INARI_EXTENSION_GATEWAY_TOKEN configured.
-	Token string
+	// LegacyToken is the deprecated shared extension-gateway gate token
+	// (pre-W2 servers with INARI_EXTENSION_GATEWAY_TOKEN). It is sent only
+	// when LegacyTokenEnabled is also set; there is no silent fallback to
+	// shared credentials.
+	LegacyToken string
+	// LegacyTokenEnabled explicitly opts into the deprecated shared gate
+	// token path for rolling server upgrades. Default false.
+	LegacyTokenEnabled bool
 }
 
 // Client is a gRPC Gateway.
 type Client struct {
-	conn  *grpc.ClientConn
-	token string
+	conn *grpc.ClientConn
+	// legacy gate token (deprecated; only sent when legacyEnabled).
+	legacyToken   string
+	legacyEnabled bool
+}
+
+// Option customizes a Client.
+type Option func(*Client)
+
+// WithLegacyGateToken configures the deprecated shared extension-gateway
+// gate token. It is inert unless WithLegacyGateTokenEnabled(true) is also
+// passed. Deprecated: retained only for rolling upgrades from pre-W2
+// control planes; per-user OIDC SSO sessions are the supported path.
+func WithLegacyGateToken(token string) Option {
+	return func(c *Client) { c.legacyToken = token }
+}
+
+// WithLegacyGateTokenEnabled explicitly enables the deprecated shared gate
+// token path. Default false: the token is never sent.
+func WithLegacyGateTokenEnabled(enabled bool) Option {
+	return func(c *Client) { c.legacyEnabled = enabled }
 }
 
 // Dial connects to the control plane's Agent Gateway. The connection is
@@ -130,12 +170,21 @@ func Dial(cfg Config) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("dial agent gateway: %w", err)
 	}
-	return &Client{conn: conn, token: cfg.Token}, nil
+	return New(conn,
+		WithLegacyGateToken(cfg.LegacyToken),
+		WithLegacyGateTokenEnabled(cfg.LegacyTokenEnabled),
+	), nil
 }
 
 // New wraps an existing connection as a Gateway. Used by Dial and by tests /
 // the e2e harness that already hold a *grpc.ClientConn (e.g. bufconn).
-func New(conn *grpc.ClientConn) *Client { return &Client{conn: conn} }
+func New(conn *grpc.ClientConn, opts ...Option) *Client {
+	c := &Client{conn: conn}
+	for _, o := range opts {
+		o(c)
+	}
+	return c
+}
 
 // Close releases the underlying connection.
 func (c *Client) Close() error { return c.conn.Close() }
@@ -152,8 +201,14 @@ func (c *Client) InvokeAction(ctx context.Context, req Request) (*agentv1.Comman
 		MetadataTenant, req.TenantID,
 		MetadataCluster, req.ClusterID,
 	)
-	if c.token != "" {
-		ctx = metadata.AppendToOutgoingContext(ctx, MetadataToken, c.token)
+	if req.UserToken != "" {
+		// Per-user credential: hop metadata only — never inside the
+		// persisted command payload, never logged.
+		ctx = metadata.AppendToOutgoingContext(ctx, MetadataUserCredential, req.UserToken)
+	}
+	if c.legacyEnabled && c.legacyToken != "" {
+		// Deprecated pre-W2 shared gate token; opt-in only.
+		ctx = metadata.AppendToOutgoingContext(ctx, MetadataToken, c.legacyToken)
 	}
 	ack := &agentv1.CommandAck{}
 	err := c.conn.Invoke(ctx, InvokeMethod, req.Command, ack, grpc.CallContentSubtype(contentSubtype))

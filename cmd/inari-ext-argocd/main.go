@@ -41,10 +41,11 @@ func run(ctx context.Context) error {
 	// metadata) but every action returns CodeUnavailable.
 	if addr := os.Getenv("INARI_AGENT_GATEWAY_ADDR"); addr != "" {
 		gw, err := gateway.Dial(gateway.Config{
-			Addr:          addr,
-			Insecure:      os.Getenv("INARI_AGENT_GATEWAY_INSECURE") == "true",
-			TLSServerName: os.Getenv("INARI_AGENT_GATEWAY_TLS_NAME"),
-			Token:         os.Getenv("INARI_EXTENSION_GATEWAY_TOKEN"),
+			Addr:               addr,
+			Insecure:           os.Getenv("INARI_AGENT_GATEWAY_INSECURE") == "true",
+			TLSServerName:      os.Getenv("INARI_AGENT_GATEWAY_TLS_NAME"),
+			LegacyToken:        legacyGateToken(),
+			LegacyTokenEnabled: legacyGateTokenEnabled(),
 		})
 		if err != nil {
 			return err
@@ -59,6 +60,24 @@ func run(ctx context.Context) error {
 		return err
 	}
 	return p.Serve(ctx)
+}
+
+// legacyGateToken returns the deprecated shared extension-gateway gate token
+// (pre-W2 control planes). Inert unless legacyGateTokenEnabled is true.
+func legacyGateToken() string { return os.Getenv("INARI_EXTENSION_GATEWAY_TOKEN") }
+
+// legacyGateTokenEnabled reports whether the deprecated shared gate token
+// path was explicitly opted into (INARI_LEGACY_GATEWAY_TOKEN=true). Default
+// off: per-user OIDC SSO sessions are the supported auth path and there is
+// no silent fallback to shared credentials.
+func legacyGateTokenEnabled() bool {
+	if os.Getenv("INARI_LEGACY_GATEWAY_TOKEN") != "true" {
+		return false
+	}
+	if os.Getenv("INARI_EXTENSION_GATEWAY_TOKEN") != "" {
+		log.Print("WARNING: INARI_LEGACY_GATEWAY_TOKEN=true: using the deprecated shared extension gate token (pre-W2 compatibility); migrate the control plane to per-user OIDC SSO sessions")
+	}
+	return true
 }
 
 func managedProjects() []string {
