@@ -203,15 +203,19 @@ func handle(cfg Config, action string) pluginsdk.Handler {
 }
 
 // downstreamToken extracts the raw per-user downstream credential from the
-// host-injected connection metadata, stripping any "Bearer " scheme prefix
-// (the gateway hop carries the raw token, not an Authorization header
-// value). The returned value is a credential: never log it.
+// host-injected connection metadata, stripping any Bearer scheme prefix
+// (case-insensitive per RFC 7235; the gateway hop carries the raw token,
+// not an Authorization header value). The returned value is a credential:
+// never log it.
 func downstreamToken(ctx context.Context) (string, bool) {
 	tok, ok := pluginsdk.DownstreamToken(ctx)
 	if !ok {
 		return "", false
 	}
-	tok = strings.TrimSpace(strings.TrimPrefix(tok, "Bearer "))
+	tok = strings.TrimSpace(tok)
+	if scheme, rest, found := strings.Cut(tok, " "); found && strings.EqualFold(scheme, "bearer") {
+		tok = strings.TrimSpace(rest)
+	}
 	if tok == "" {
 		return "", false
 	}

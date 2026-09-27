@@ -71,6 +71,42 @@ func invokeWithSession(t *testing.T, c *testkit.Client, action string, payload a
 	return c.Invoke(ctx, action, testAuth, b)
 }
 
+// TestDownstreamTokenSchemeStripping proves the gateway hop receives the
+// raw token regardless of how the injected credential was schemed/cased.
+func TestDownstreamTokenSchemeStripping(t *testing.T) {
+	payload := map[string]any{
+		"clusterId": "cluster-1",
+		"app":       map[string]any{"name": "a", "namespace": "argocd", "project": "inari"},
+	}
+	for _, tc := range []struct{ name, injected, want string }{
+		{"bearer", "Bearer tok-1", "tok-1"},
+		{"bearer lowercase", "bearer tok-2", "tok-2"},
+		{"bearer uppercase", "BEARER tok-3", "tok-3"},
+		{"raw token, no scheme", "tok-4", "tok-4"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			gw := &fakeGateway{ack: &agentv1.CommandAck{CommandId: "cmd-1", Result: agentv1.CommandResult_COMMAND_RESULT_APPLIED}}
+			c := build(t, gw)
+			b, err := json.Marshal(payload)
+			if err != nil {
+				t.Fatalf("marshal: %v", err)
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			ctx = metadata.AppendToOutgoingContext(ctx,
+				pluginsdk.HeaderAuthMethod, pluginsdk.AuthMethodOIDCSSOSession.String(),
+				pluginsdk.HeaderDownstreamAuthorization, tc.injected,
+			)
+			if _, err := c.Invoke(ctx, argocd.ActionSync, testAuth, b); err != nil {
+				t.Fatalf("Invoke: %v", err)
+			}
+			if gw.last.UserToken != tc.want {
+				t.Fatalf("injected %q: want raw token %q on the hop, got %q", tc.injected, tc.want, gw.last.UserToken)
+			}
+		})
+	}
+}
+
 func TestCapabilities(t *testing.T) {
 	c := build(t, &fakeGateway{})
 	ctx := context.Background()
