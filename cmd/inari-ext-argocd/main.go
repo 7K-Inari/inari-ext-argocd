@@ -10,6 +10,10 @@
 //	                             Inari (default "inari"); all actions are
 //	                             scoped to these projects
 //	INARI_ACTION_TIMEOUT         e.g. "60s"; per-action round-trip bound
+//	INARI_LEGACY_GATEWAY_TOKEN   "true" opts into the deprecated shared
+//	                             extension gate token (pre-W2 compat, off by
+//	                             default); the token itself still comes from
+//	                             INARI_EXTENSION_GATEWAY_TOKEN
 package main
 
 import (

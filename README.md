@@ -60,6 +60,26 @@ Backend config (env): `INARI_AGENT_GATEWAY_ADDR` (required in prod),
 `INARI_AGENT_GATEWAY_INSECURE`, `INARI_AGENT_GATEWAY_TLS_NAME`,
 `INARI_MANAGED_PROJECTS` (default `inari`), `INARI_ACTION_TIMEOUT`.
 
+### Authentication (per-user OIDC SSO sessions)
+
+The extension declares `oidc-sso-session` (provider key `argocd`) via the
+plugin.v1 `AuthMethod` contract (`extension.yaml` `auth.methods`). The
+control plane resolves the caller's per-user ArgoCD SSO session, injects it
+as `X-Inari-Downstream-Authorization` / `X-Inari-Auth-Method` connection
+metadata (never inside `AuthContext`), and the extension forwards it to the
+Agent Gateway as `x-inari-user-credential` hop metadata only — the persisted
+command payload carries just a control-plane-minted vault reference, and the
+token is never logged. Missing/expired sessions fail closed with a typed
+re-auth signal (`401` + `X-Inari-Reauth: argocd` +
+`{"code":"reauth_required"}`; plugin errors carry
+`details{code: reauth_required, provider: argocd}`), which the UI uses to
+drive the zero-prompt SSO bootstrap and retry once.
+
+Deprecated: `INARI_EXTENSION_GATEWAY_TOKEN` (shared pre-W2 gate token) is
+inert unless `INARI_LEGACY_GATEWAY_TOKEN=true` is also set — a narrow
+compatibility path for rolling server upgrades, off by default with no
+silent fallback to shared credentials.
+
 UI local dev: `cd ui && npm install && npx inari-ui-ext dev ./src/index.tsx`
 (SDK dev harness with a mock control plane).
 
@@ -121,6 +141,12 @@ and that should be fixed upstream:
    repo ships its own webpack MF production config. A canonical
    `inari-ui-ext build` emitting `remoteEntry.js` would keep third parties
    from drifting.
+6. **No typed re-auth error helper in the Go SDK** — the re-auth/session-
+   expired contract (`code=reauth_required`, `X-Inari-Reauth` provider
+   header) is fixed by the server, but plugins hand-roll the typed
+   `PluginError.details` and HTTP mapping (see `internal/extplugin` and
+   `cmd/inari-ext-argocd-http`). An SDK `ReauthError(provider)` helper would
+   keep extensions consistent.
 
 ## Versioning & release
 
