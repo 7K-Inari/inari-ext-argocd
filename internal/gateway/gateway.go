@@ -118,6 +118,13 @@ type Config struct {
 	Insecure bool
 	// TLSServerName overrides the TLS server name when set.
 	TLSServerName string
+	// TunnelTokenURL is the OIDC token endpoint used with TunnelClientID /
+	// TunnelClientSecret for ADR-0008 tunnel authentication.
+	TunnelTokenURL string
+	// TunnelClientID / TunnelClientSecret are the extension's dedicated
+	// client credentials (returned once at registration).
+	TunnelClientID     string
+	TunnelClientSecret string
 	// LegacyToken is the deprecated shared extension-gateway gate token
 	// (pre-W2 servers with INARI_EXTENSION_GATEWAY_TOKEN). It is sent only
 	// when LegacyTokenEnabled is also set; there is no silent fallback to
@@ -134,6 +141,8 @@ type Client struct {
 	// legacy gate token (deprecated; only sent when legacyEnabled).
 	legacyToken   string
 	legacyEnabled bool
+	// tunnelAuth mints the extension's client_credentials JWT (ADR-0008).
+	tunnelAuth *ClientCredentialsSource
 }
 
 // Option customizes a Client.
@@ -153,6 +162,13 @@ func WithLegacyGateTokenEnabled(enabled bool) Option {
 	return func(c *Client) { c.legacyEnabled = enabled }
 }
 
+// WithTunnelAuth configures the client-credentials token source used to
+// authenticate InvokeAction tunnel calls (ADR-0008). When unset, calls are
+// sent without an Authorization header and fail closed on W2+ servers.
+func WithTunnelAuth(src *ClientCredentialsSource) Option {
+	return func(c *Client) { c.tunnelAuth = src }
+}
+
 // Dial connects to the control plane's Agent Gateway. The connection is
 // established lazily; unreachable endpoints surface as CodeUnavailable at
 // call time (fail closed).
@@ -170,10 +186,15 @@ func Dial(cfg Config) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("dial agent gateway: %w", err)
 	}
-	return New(conn,
+	opts := []Option{
 		WithLegacyGateToken(cfg.LegacyToken),
 		WithLegacyGateTokenEnabled(cfg.LegacyTokenEnabled),
-	), nil
+	}
+	if cfg.TunnelTokenURL != "" && cfg.TunnelClientID != "" && cfg.TunnelClientSecret != "" {
+		opts = append(opts, WithTunnelAuth(NewClientCredentialsSource(
+			cfg.TunnelTokenURL, cfg.TunnelClientID, cfg.TunnelClientSecret)))
+	}
+	return New(conn, opts...), nil
 }
 
 // New wraps an existing connection as a Gateway. Used by Dial and by tests /
@@ -205,6 +226,13 @@ func (c *Client) InvokeAction(ctx context.Context, req Request) (*agentv1.Comman
 		// Per-user credential: hop metadata only — never inside the
 		// persisted command payload, never logged.
 		ctx = metadata.AppendToOutgoingContext(ctx, MetadataUserCredential, req.UserToken)
+	}
+	if c.tunnelAuth != nil {
+		tok, err := c.tunnelAuth.Token(ctx)
+		if err != nil {
+			return nil, err
+		}
+		ctx = metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+tok)
 	}
 	if c.legacyEnabled && c.legacyToken != "" {
 		// Deprecated pre-W2 shared gate token; opt-in only.

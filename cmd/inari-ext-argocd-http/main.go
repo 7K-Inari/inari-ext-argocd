@@ -53,6 +53,9 @@ func run() error {
 			TLSServerName:      os.Getenv("INARI_AGENT_GATEWAY_TLS_NAME"),
 			LegacyToken:        legacyGateToken(),
 			LegacyTokenEnabled: legacyGateTokenEnabled(),
+			TunnelTokenURL:     os.Getenv("INARI_EXTENSION_TOKEN_URL"),
+			TunnelClientID:     os.Getenv("INARI_EXTENSION_CLIENT_ID"),
+			TunnelClientSecret: os.Getenv("INARI_EXTENSION_CLIENT_SECRET"),
 		})
 		if err != nil {
 			return err
