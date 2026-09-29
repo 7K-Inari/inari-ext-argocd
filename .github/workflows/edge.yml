@@ -125,10 +125,14 @@ jobs:
           EDGE: ${{ needs.version.outputs.edge_ui }}
         run: |
           tag="ui-v${EDGE}"
-          gh release create "$tag" \
-            --prerelease \
-            --title "ui edge ${EDGE}" \
-            --notes "Edge build of the UI remote from ${GITHUB_SHA}. Superseded by the next stable ui-vX.Y.Z release."
+          if gh release view "$tag" > /dev/null 2>&1; then
+            echo "prerelease $tag already exists — skipping create (workflow rerun)"
+          else
+            gh release create "$tag" \
+              --prerelease \
+              --title "ui edge ${EDGE}" \
+              --notes "Edge build of the UI remote from ${GITHUB_SHA}. Superseded by the next stable ui-vX.Y.Z release."
+          fi
           find ui/dist \( -name '*.js' -o -name '*.js.LICENSE.txt' \) -exec gh release upload "$tag" {} --clobber \;
 
   prerelease:
@@ -143,11 +147,15 @@ jobs:
           EDGE: ${{ needs.version.outputs.edge_backend }}
         run: |
           set -euo pipefail
-          gh release create "v${EDGE}" \
-            --prerelease \
-            --target "$GITHUB_SHA" \
-            --title "edge ${EDGE}" \
-            --notes "Edge build from ${GITHUB_SHA}. Image tagged \`:edge\` and \`:${EDGE}\` (when a Dockerfile exists). Superseded by the next stable vX.Y.Z release."
+          if gh release view "v${EDGE}" > /dev/null 2>&1; then
+            echo "prerelease v${EDGE} already exists — skipping create (workflow rerun)"
+          else
+            gh release create "v${EDGE}" \
+              --prerelease \
+              --target "$GITHUB_SHA" \
+              --title "edge ${EDGE}" \
+              --notes "Edge build from ${GITHUB_SHA}. Image tagged \`:edge\` and \`:${EDGE}\` (when a Dockerfile exists). Superseded by the next stable vX.Y.Z release."
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag -f edge "$GITHUB_SHA"
