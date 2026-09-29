@@ -1,8 +1,8 @@
 name: edge
 
 # Per-merge edge releases: every push to main tags the backend image
-# <pending>-edge.<shortsha> (plus :edge) and cuts per-component GitHub
-# prereleases (vX.Y.Z-edge.<sha> for the backend, ui-vX.Y.Z-edge.<sha> for
+# <pending>-<shortsha> (plus :edge) and cuts per-component GitHub
+# prereleases (vX.Y.Z-<sha> for the backend, ui-vX.Y.Z-<sha> for
 # the UI remote, with its dist assets attached). Skipped on release merges —
 # release.yml covers that commit.
 on:
@@ -136,12 +136,27 @@ jobs:
     if: always() && needs.edge-image.result != 'failure' && needs.edge-ui.result != 'failure'
     runs-on: ubuntu-latest
     steps:
-      - name: Create backend edge prerelease
+      - uses: actions/checkout@v4
+      - name: Create backend edge prerelease + move the edge channel tag
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           EDGE: ${{ needs.version.outputs.edge_backend }}
         run: |
+          set -euo pipefail
           gh release create "v${EDGE}" \
             --prerelease \
+            --target "$GITHUB_SHA" \
             --title "edge ${EDGE}" \
             --notes "Edge build from ${GITHUB_SHA}. Image tagged \`:edge\` and \`:${EDGE}\` (when a Dockerfile exists). Superseded by the next stable vX.Y.Z release."
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f edge "$GITHUB_SHA"
+          git push -f origin refs/tags/edge
+          if gh release view edge > /dev/null 2>&1; then
+            gh release edit edge --prerelease --title "edge (v${EDGE})" \
+              --notes "Latest edge build: \`v${EDGE}\` (${GITHUB_SHA})."
+          else
+            gh release create edge --prerelease --target "$GITHUB_SHA" \
+              --title "edge (v${EDGE})" \
+              --notes "Latest edge build: \`v${EDGE}\` (${GITHUB_SHA})."
+          fi
