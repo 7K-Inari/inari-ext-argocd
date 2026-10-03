@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.4.0](https://github.com/7K-Inari/inari-ext-argocd/compare/v0.3.1...v0.4.0) (2026-10-03)
+
+
+### Features
+
+* **agentstub:** signal re-auth on downstream 401/403 ([81ee628](https://github.com/7K-Inari/inari-ext-argocd/commit/81ee628990893bec839e5c4e76a0d3fbf98ccc70))
+* **extplugin:** declare oidc-sso-session auth; forward per-user token; typed re-auth ([1aca8f3](https://github.com/7K-Inari/inari-ext-argocd/commit/1aca8f33b8ae0f3207d7c509b04d9e9edc0d8ae5))
+* **gateway:** forward per-user credential as hop metadata; gate legacy token off by default ([1dca4ee](https://github.com/7K-Inari/inari-ext-argocd/commit/1dca4eee9970ab316cac2f6adef2a4daaf6c2fd8))
+* **http:** forward host-injected credentials; typed re-auth signal in dial mode ([5d544a0](https://github.com/7K-Inari/inari-ext-argocd/commit/5d544a04df436a6c2e7e4f7f7a03a26e328afc7c))
+* per-user OIDC SSO sessions for ArgoCD extension (W4) ([9a1f10e](https://github.com/7K-Inari/inari-ext-argocd/commit/9a1f10e794824da74014c564410ee2e0def98afe))
+* **release:** per-merge edge releases (vX.Y.Z-&lt;sha&gt; + moving edge channel) ([#19](https://github.com/7K-Inari/inari-ext-argocd/issues/19)) ([d16932a](https://github.com/7K-Inari/inari-ext-argocd/commit/d16932ab17d232b1281c797d086677dc718ca7c8))
+
+
+### Bug Fixes
+
+* case-insensitive Bearer scheme stripping; document 403 re-auth rationale ([485511a](https://github.com/7K-Inari/inari-ext-argocd/commit/485511a6a23e9929b0bd3f6d943cf4a26fd1b70d))
+* **ci:** drop root component so standalone root releases are detected ([f87ec28](https://github.com/7K-Inari/inari-ext-argocd/commit/f87ec28864dae8478f454c3227c4cf3400fc195d))
+* **ci:** drop root component so standalone root releases are detected ([b086355](https://github.com/7K-Inari/inari-ext-argocd/commit/b08635560dcb4239ec3790a7837929f9dd44c319))
+* fail closed on scheme-only downstream credential ([4d87034](https://github.com/7K-Inari/inari-ext-argocd/commit/4d87034484c76b1f1768af81a64f0c8372a20a41))
+
 ## [0.3.1](https://github.com/7K-Inari/inari-ext-argocd/compare/v0.3.0...v0.3.1) (2026-09-25)
 
 
