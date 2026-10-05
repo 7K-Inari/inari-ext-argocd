@@ -16,6 +16,8 @@ github.com/7K-Inari/inari-plugin-sdk v1.2.1-0.20260927101146-7f531e4246e9 h1:ckg
 github.com/7K-Inari/inari-plugin-sdk v1.2.1-0.20260927101146-7f531e4246e9/go.mod h1:VwnMWMXRv49NA5kj1LFf8C5Qz5/UPaOCWbketOjQMXM=
 github.com/7K-Inari/inari-plugin-sdk v1.2.1-e466300 h1:Dba36G+LyiyxOBeQRCr8zjmYe1ESYIdixlYwhBnRWlE=
 github.com/7K-Inari/inari-plugin-sdk v1.2.1-e466300/go.mod h1:yP8gGODnppFmnDL9fdmKp3C6UkbiBAVR2P6A8mriL1U=
+github.com/7K-Inari/inari-plugin-sdk v1.2.1-fcf64d4 h1:fD0d0ywiPktK1IcJMy7CiRKcwM3+U47iUESrea+N4rc=
+github.com/7K-Inari/inari-plugin-sdk v1.2.1-fcf64d4/go.mod h1:ENBAHP7eemDvNppjpb8gaUoS026ATtCgW0HYWBOeD5s=
 github.com/bufbuild/protocompile v0.14.1 h1:iA73zAf/fyljNjQKwYzUHD6AD4R8KMasmwa/FBatYVw=
 github.com/bufbuild/protocompile v0.14.1/go.mod h1:ppVdAIhbr2H8asPk6k4pY7t9zB1OU5DoEw9xY/FUi1c=
 github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UFvs=
