@@ -2,6 +2,7 @@ connectrpc.com/connect v1.20.0 h1:6TNDAB+WeNd2uolWNlYczB5E0KNNaVMNUEx8JEUsPmQ=
 connectrpc.com/connect v1.20.0/go.mod h1:A2ygJrukXwWy32vkCAAHNVguZrqZ+jeZ9rGRnGR4dN4=
 connectrpc.com/connect v1.21.0 h1:LhqSJt7jHf5NJBo9Jq/t/9FjcYAideif0mg+qe2jCUs=
 connectrpc.com/connect v1.21.0/go.mod h1:A2ygJrukXwWy32vkCAAHNVguZrqZ+jeZ9rGRnGR4dN4=
+connectrpc.com/connect/v2 v2.0.0/go.mod h1:N32OLrstcPUzkykFynnefFro3+xzSdOrZlK2jHmS/xo=
 github.com/7K-Inari/inari-api v0.6.1-0.20260926220016-52ea5837ecac h1:rXt8atDUHOq1VT7VgFnSbKqMoEsc7E2R9x1MA9K4Vbg=
 github.com/7K-Inari/inari-api v0.6.1-0.20260926220016-52ea5837ecac/go.mod h1:+74y2AihE0BCqM4L2G6AIjN+pu5C88YhW8wFKf7JmmA=
 github.com/7K-Inari/inari-api v0.6.1-0.20261003043746-fb48be68ef84 h1:HmR8do5xW47A1OCZw7kC1o3QzAwA74Ntl5d/qBtbmgU=
