@@ -16,6 +16,8 @@ github.com/7K-Inari/inari-api v0.6.1-0.20261006112808-a5cf4efeb47d h1:+bL6/5/4hS
 github.com/7K-Inari/inari-api v0.6.1-0.20261006112808-a5cf4efeb47d/go.mod h1:K/nclQUG5E7bTEm9gq8KC+kndBECn+ZM7U84hmlSM7Y=
 github.com/7K-Inari/inari-api v0.6.1-0.20261006163044-41c759c60f3c h1:Av00WipOhQ/K9SI77BZBefJJ3NT2Bt4scF1GRVVGMdE=
 github.com/7K-Inari/inari-api v0.6.1-0.20261006163044-41c759c60f3c/go.mod h1:K/nclQUG5E7bTEm9gq8KC+kndBECn+ZM7U84hmlSM7Y=
+github.com/7K-Inari/inari-api v0.6.1-0.20261007164457-ecc36cc4c666 h1:4OFlqQtCFpKTlNZpH9E6H4UjHtVpVGBROEigQAoqoTk=
+github.com/7K-Inari/inari-api v0.6.1-0.20261007164457-ecc36cc4c666/go.mod h1:K/nclQUG5E7bTEm9gq8KC+kndBECn+ZM7U84hmlSM7Y=
 github.com/7K-Inari/inari-plugin-sdk v1.2.1-0.20260927101146-7f531e4246e9 h1:ckgTYtVbLNr/sOphsuRwiPkuWLvXSHB6B697DsHgu2c=
 github.com/7K-Inari/inari-plugin-sdk v1.2.1-0.20260927101146-7f531e4246e9/go.mod h1:VwnMWMXRv49NA5kj1LFf8C5Qz5/UPaOCWbketOjQMXM=
 github.com/7K-Inari/inari-plugin-sdk v1.2.1-e466300 h1:Dba36G+LyiyxOBeQRCr8zjmYe1ESYIdixlYwhBnRWlE=
