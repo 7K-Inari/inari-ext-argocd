@@ -184,7 +184,7 @@ describe('components', () => {
         },
       }),
     );
-    expect(on).toContain('GitOps: ArgoCD');
+    expect(on).toContain('GitOps · ArgoCD');
     expect(on).toContain('Healthy');
   });
 });
