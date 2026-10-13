@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { createElement } from 'react';
+import { act, createElement } from 'react';
 
 import extension from '../src/index';
 import { invokeAction, argocdAppRef } from '../src/api';
@@ -40,7 +40,7 @@ describe('extension manifest (blueprint contract)', () => {
   it('registers name, kind and all five slots', () => {
     expect(extension.manifest.name).toBe('inari-ext-argocd');
     expect(extension.manifest.kind).toBe('ui');
-    const slots = extension.manifest.slots.map((s) => `${s.kind}:${s.name}`);
+    const slots = extension.manifest.slots.map((s: { kind: string; name: string }) => `${s.kind}:${s.name}`);
     expect(slots).toEqual([
       'cluster-tab:argocd-health',
       'catalog-card:argocd-badge',
