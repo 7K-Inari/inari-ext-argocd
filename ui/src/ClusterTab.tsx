@@ -26,7 +26,10 @@ export function ArgoCDHealthTab({ cluster }: ClusterTabSlotProps) {
   useEffect(() => configureAuth(() => auth.getToken()), [auth]);
 
   useEffect(() => {
-    if (!current) return;
+    if (!current) {
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     setLoading(true);
     listClusterInstances(current.orgId, cluster.id)
