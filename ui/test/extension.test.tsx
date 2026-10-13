@@ -168,6 +168,33 @@ describe('components', () => {
     root.unmount();
   });
 
+  it('ClusterTab shows the empty state, not a perpetual skeleton, with no tenant', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const { createRoot } = await import('react-dom/client');
+    const { act } = await import('react');
+    const noTenant: TenantState = { ...testTenant, current: null };
+    const el = document.createElement('div');
+    document.body.appendChild(el);
+    const root = createRoot(el);
+    await act(async () => {
+      root.render(
+        createElement(AuthProvider, {
+          value: testAuth,
+          children: createElement(TenantProvider, {
+            value: noTenant,
+            children: createElement(ArgoCDHealthTab, {
+              cluster: { id: 'cluster-1', name: 'prod-1', tenantId: 't', state: 'Active' },
+            }),
+          }),
+        }),
+      );
+    });
+    expect(el.innerHTML).toContain('No instances');
+    expect(el.innerHTML).not.toContain('skeleton');
+    expect(fetchSpy).not.toHaveBeenCalled();
+    root.unmount();
+  });
+
   it('CatalogCard renders badge only for argocd-delivered items', () => {
     const off = renderToStaticMarkup(
       createElement(ArgoCDDeliveryBadge, { catalogItem: { id: 'c', name: 'x', source: 'curated', version: '1' } }),
