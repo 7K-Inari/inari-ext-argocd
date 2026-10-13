@@ -75,7 +75,11 @@ export function ArgoCDHealthTab({ cluster }: ClusterTabSlotProps) {
                 <HealthBadge health={i.health} />
                 {state && state !== 'running' ? <span className="tag">{state}</span> : null}
                 {message ? (
-                  <span className="badge badge-warning" title={message}>
+                  <span
+                    className="badge badge-warning"
+                    title={message}
+                    style={{ maxWidth: 360, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                  >
                     {message}
                   </span>
                 ) : null}
