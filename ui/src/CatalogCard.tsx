@@ -12,7 +12,7 @@ export function ArgoCDDeliveryBadge({ catalogItem }: CatalogCardSlotProps) {
   const health = hints['inari.io/health'] as string | undefined;
   return (
     <span title="Delivered via tenant-local ArgoCD">
-      GitOps: ArgoCD {health ? <HealthBadge health={health} /> : null}
+      <span className="tag">GitOps · ArgoCD</span> {health ? <HealthBadge health={health} /> : null}
     </span>
   );
 }
