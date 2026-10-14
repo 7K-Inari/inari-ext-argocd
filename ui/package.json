@@ -14,7 +14,7 @@
   "dependencies": {
     "@7k-inari/ui-plugin-sdk": "^0.1.5",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.1"
   },
   "devDependencies": {
     "@types/react": "^19.3.0",
