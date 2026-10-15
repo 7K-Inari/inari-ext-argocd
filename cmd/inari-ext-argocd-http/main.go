@@ -23,8 +23,8 @@ import (
 	"strings"
 	"time"
 
-	"connectrpc.com/connect"
-
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	pluginv1 "github.com/7K-Inari/inari-api/gen/go/inari/plugin/v1"
 	"github.com/7K-Inari/inari-api/gen/go/inari/plugin/v1/pluginv1connect"
 	pluginsdk "github.com/7K-Inari/inari-plugin-sdk"
@@ -69,8 +69,9 @@ func run() error {
 
 	mux := http.NewServeMux()
 	// Contract surface (Verify handshake, health, capabilities).
-	path, handler := pluginv1connect.NewPluginContractServiceHandler(connectAdapter{s: pluginsdk.NewGRPCService(p)})
-	mux.Handle(path, handler)
+	rpcServer := connect.NewServer()
+	pluginv1connect.RegisterPluginContractServiceHandler(rpcServer, connectAdapter{s: pluginsdk.NewGRPCService(p)})
+	connecthttp.Mount(mux, rpcServer)
 	// Proxy surface: POST /actions/<action>.
 	mux.HandleFunc("/actions/", actionsHandler(p))
 
@@ -78,18 +79,18 @@ func run() error {
 	if addr == "" {
 		addr = ":8080"
 	}
-	log.Printf("inari-ext-argocd-http: dial mode listening on %s (contract at %s)", addr, path)
+	log.Printf("inari-ext-argocd-http: dial mode listening on %s (contract at /%s/)", addr, pluginv1connect.PluginContractServiceName)
 	return http.ListenAndServe(addr, mux) //nolint:gosec // test/dev server; platform deployments sit behind the control-plane proxy
 }
 
 // connectAdapter bridges the SDK's gRPC-shaped service to the ConnectRPC
-// handler interface (same messages, connect.Request/Response wrappers).
+// handler interface (same messages, plain request/response in connect v2).
 type connectAdapter struct {
 	s pluginv1.PluginContractServiceServer
 }
 
-func (a connectAdapter) GetInfo(ctx context.Context, req *connect.Request[pluginv1.GetInfoRequest]) (*connect.Response[pluginv1.GetInfoResponse], error) {
-	r, err := a.s.GetInfo(ctx, req.Msg)
+func (a connectAdapter) GetInfo(ctx context.Context, req *pluginv1.GetInfoRequest) (*pluginv1.GetInfoResponse, error) {
+	r, err := a.s.GetInfo(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -100,31 +101,31 @@ func (a connectAdapter) GetInfo(ctx context.Context, req *connect.Request[plugin
 	if v := os.Getenv("INARI_COMPAT_API_VERSION"); v != "" && r.GetInfo() != nil {
 		r.Info.ApiVersion = v
 	}
-	return connect.NewResponse(r), nil
+	return r, nil
 }
 
-func (a connectAdapter) GetCapabilities(ctx context.Context, req *connect.Request[pluginv1.GetCapabilitiesRequest]) (*connect.Response[pluginv1.GetCapabilitiesResponse], error) {
-	r, err := a.s.GetCapabilities(ctx, req.Msg)
+func (a connectAdapter) GetCapabilities(ctx context.Context, req *pluginv1.GetCapabilitiesRequest) (*pluginv1.GetCapabilitiesResponse, error) {
+	r, err := a.s.GetCapabilities(ctx, req)
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(r), nil
+	return r, nil
 }
 
-func (a connectAdapter) Invoke(ctx context.Context, req *connect.Request[pluginv1.InvokeRequest]) (*connect.Response[pluginv1.InvokeResponse], error) {
-	r, err := a.s.Invoke(ctx, req.Msg)
+func (a connectAdapter) Invoke(ctx context.Context, req *pluginv1.InvokeRequest) (*pluginv1.InvokeResponse, error) {
+	r, err := a.s.Invoke(ctx, req)
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(r), nil
+	return r, nil
 }
 
-func (a connectAdapter) HealthCheck(ctx context.Context, req *connect.Request[pluginv1.HealthCheckRequest]) (*connect.Response[pluginv1.HealthCheckResponse], error) {
-	r, err := a.s.HealthCheck(ctx, req.Msg)
+func (a connectAdapter) HealthCheck(ctx context.Context, req *pluginv1.HealthCheckRequest) (*pluginv1.HealthCheckResponse, error) {
+	r, err := a.s.HealthCheck(ctx, req)
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(r), nil
+	return r, nil
 }
 
 // Host-injected headers carrying the resolved per-user downstream

@@ -11,6 +11,7 @@ require (
 )
 
 require (
+	connectrpc.com/connect/v2 v2.0.0 // indirect
 	github.com/fatih/color v1.13.0 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/hashicorp/go-hclog v1.6.3 // indirect
@@ -24,3 +25,5 @@ require (
 	golang.org/x/text v0.43.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260706201446-f0a921348800 // indirect
 )
+
+replace github.com/7K-Inari/inari-api => ../inari-api
