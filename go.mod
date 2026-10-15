@@ -3,8 +3,8 @@ module github.com/7K-Inari/inari-ext-argocd
 go 1.26.3
 
 require (
-	connectrpc.com/connect v1.21.1
-	github.com/7K-Inari/inari-api v0.6.1-0.20261014191937-1a30c6c847d5
+	connectrpc.com/connect/v2 v2.0.0
+	github.com/7K-Inari/inari-api v0.6.1-0.20261015003247-4a8072241473
 	github.com/7K-Inari/inari-plugin-sdk v1.2.1-fcf64d4
 	google.golang.org/grpc v1.84.0
 	google.golang.org/protobuf v1.36.12
