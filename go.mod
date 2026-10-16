@@ -4,7 +4,7 @@ go 1.26.3
 
 require (
 	connectrpc.com/connect/v2 v2.0.1
-	github.com/7K-Inari/inari-api v0.7.0-ace8d88
+	github.com/7K-Inari/inari-api v0.7.0-c2fef8b
 	github.com/7K-Inari/inari-plugin-sdk v1.2.1-ffb897b
 	google.golang.org/grpc v1.84.0
 	google.golang.org/protobuf v1.36.12
