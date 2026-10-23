@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/7K-Inari/inari-ext-argocd/compare/ui-v0.2.1...ui-v0.3.0) (2026-10-23)
+
+
+### Features
+
+* **ui:** re-skin extension slots with 7k-design-system classes ([c19b1ad](https://github.com/7K-Inari/inari-ext-argocd/commit/c19b1ade9f7228a3a674281f6a8f58423e77e25f))
+
 ## [0.2.1](https://github.com/7K-Inari/inari-ext-argocd/compare/ui-v0.2.0...ui-v0.2.1) (2026-09-24)
 
 
