@@ -1,6 +1,6 @@
 # Backend extension image: the plugin binary the inari-server Extension Host
 # launches as a supervised sidecar (plan §5.8, §6).
-FROM golang:1.27@sha256:e519d3b0a5b285e5aa53ab9eef02bc6bbb9cb04608389b743a136a9ce75f0d1e AS build
+FROM golang:1.27@sha256:01aa404fa56b604b6f48e90c1d6e2c79fe5cd78f9592f78d80303fbe171cdcc0 AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
